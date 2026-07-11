@@ -21,7 +21,7 @@
     "bootstrap:crm": "tsx scripts/bootstrap-crm.ts",
     "validate:hybrid": "tsx scripts/validate-hybrid-extraction.ts",
     "seed:crm": "tsx scripts/seed-crm.ts",
-    "postinstall": "prisma generate",
+    "postinstall": "prisma generate && node scripts/copy-pdf-worker.mjs",
     "migrate:turso": "tsx scripts/migrate-to-turso.ts",
     "migrate:blob": "tsx scripts/migrate-storage-to-blob.ts",
     "db:clear-logs": "tsx scripts/clear-logs.ts"
