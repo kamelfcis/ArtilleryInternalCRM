@@ -1,0 +1,13 @@
+﻿# Keep production deploys small — runtime files live in Turso + Blob.
+.env
+.env.*
+!.env.example
+
+/storage/**
+**/storage/**
+node_modules
+.next
+.git
+
+# Local source document tree (already imported to DB + Blob)
+**/دار المدفعية/**

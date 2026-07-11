@@ -1,11 +1,11 @@
-import { NextResponse, type NextRequest } from "next/server";
+﻿import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
-import { SESSION_COOKIE } from "@/lib/auth/session";
+import { SESSION_COOKIE } from "@/lib/auth/session-constants";
 
 /**
  * Edge middleware guarding the application. It performs a fast, stateless JWT
  * signature/expiry check to gate access; full authorization (role, active
- * state, folder permissions) is enforced again server-side on every action —
+ * state, folder permissions) is enforced again server-side on every action â€”
  * the middleware is a first line of defense, not the sole one.
  */
 const secretKey = new TextEncoder().encode(process.env.AUTH_SECRET ?? "");
@@ -54,3 +54,4 @@ export const config = {
   // download route (which enforces its own auth and must stream freely).
   matcher: ["/((?!_next/static|_next/image|favicon.ico|assets/).*)"],
 };
+

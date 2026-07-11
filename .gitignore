@@ -45,3 +45,5 @@ next-env.d.ts
 
 prisma/turso-schema.sql
 scripts/apply-turso-schema.mjs
+.vercel
+.env*.local

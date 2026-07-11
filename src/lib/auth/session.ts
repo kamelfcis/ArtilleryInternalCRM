@@ -1,10 +1,11 @@
-import "server-only";
+﻿import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { env } from "@/lib/env";
 import type { Role } from "@/lib/constants";
+import { SESSION_COOKIE } from "@/lib/auth/session-constants";
 
-export const SESSION_COOKIE = "artillery_session";
+export { SESSION_COOKIE };
 
 const secretKey = new TextEncoder().encode(env.AUTH_SECRET);
 
