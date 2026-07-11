@@ -61,6 +61,14 @@ export async function POST(req: NextRequest) {
     if (error instanceof AppError) {
       return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
     }
+    const detail = error instanceof Error ? error.message : String(error);
+    if (/wasm|tesseract|ENOENT|Aborted/i.test(detail)) {
+      console.error("[crm.scan] OCR engine error", error);
+      return NextResponse.json(
+        { error: "تعذّر تهيئة التعرف الضوئي على الخادم. أعد المحاولة أو استخدم ملفًا أصغر." },
+        { status: 503 },
+      );
+    }
     console.error("[crm.scan] unexpected error", error);
     return NextResponse.json({ error: "تعذّر تحليل المستند" }, { status: 500 });
   }

@@ -7,7 +7,12 @@ class ImageParser implements DocumentParser {
   readonly name = "image";
 
   supports(extension: string): boolean {
-    return extension === "png" || extension === "jpg" || extension === "jpeg";
+    return (
+      extension === "png" ||
+      extension === "jpg" ||
+      extension === "jpeg" ||
+      extension === "webp"
+    );
   }
 
   async parse(input: ParserInput): Promise<ExtractionResult> {

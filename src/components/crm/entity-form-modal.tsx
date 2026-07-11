@@ -186,9 +186,34 @@ function ScanPanel({
         return;
       }
 
+      if (res.status === 504 || res.status === 524) {
+        setResult({
+          ok: false,
+          text: "استغرق تحليل المستند وقتًا طويلًا. جرّب ملفًا أصغر أو صورة أوضح.",
+        });
+        return;
+      }
+      if (res.status === 502 || res.status === 503) {
+        setResult({
+          ok: false,
+          text: "حدث خطأ في الخادم أثناء تحليل المستند. أعد المحاولة بعد قليل.",
+        });
+        return;
+      }
+      if (res.status === 413) {
+        setResult({ ok: false, text: "حجم الملف كبير جدًا (الحد 15 ميجابايت)." });
+        return;
+      }
+
       const contentType = res.headers.get("content-type") ?? "";
       if (!contentType.includes("application/json")) {
-        setResult({ ok: false, text: "استجابة غير متوقعة من الخادم" });
+        setResult({
+          ok: false,
+          text:
+            res.status >= 500
+              ? "حدث خطأ في الخادم أثناء تحليل المستند. أعد المحاولة بعد قليل."
+              : "استجابة غير متوقعة من الخادم",
+        });
         return;
       }
 

@@ -1,4 +1,10 @@
 {
   "buildCommand": "prisma generate && node scripts/prebuild-clear-logs.mjs && next build",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "functions": {
+    "src/app/api/crm/scan/route.ts": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  }
 }

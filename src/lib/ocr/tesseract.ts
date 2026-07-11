@@ -1,3 +1,4 @@
+import os from "node:os";
 import path from "node:path";
 import type { Worker } from "tesseract.js";
 
@@ -5,10 +6,14 @@ import type { Worker } from "tesseract.js";
  * Shared Tesseract worker (Arabic + English). Creating a worker loads several
  * MB of language data, so the whole run reuses ONE worker — call `ocrImage`
  * per page and `shutdownOcr` once at the end. Trained-data is cached under
- * `.cache/tesseract` (gitignored) so only the first ever run downloads it.
+ * `.cache/tesseract` locally or `/tmp/tesseract` on Vercel (read-only cwd).
  */
 
-const CACHE_DIR = path.resolve(process.cwd(), ".cache", "tesseract");
+function tesseractCacheDir(): string {
+  if (process.env.VERCEL) return path.join(os.tmpdir(), "tesseract");
+  return path.resolve(process.cwd(), ".cache", "tesseract");
+}
+
 const LANGS = ["ara", "eng"];
 
 let workerPromise: Promise<Worker> | null = null;
@@ -18,7 +23,7 @@ async function getWorker(): Promise<Worker> {
     workerPromise = (async () => {
       const { createWorker } = await import("tesseract.js");
       return createWorker(LANGS, undefined, {
-        cachePath: CACHE_DIR,
+        cachePath: tesseractCacheDir(),
         gzip: true,
       });
     })();
