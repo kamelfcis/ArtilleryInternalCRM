@@ -5,7 +5,7 @@
   "description": "نظام إدارة الوثائق وعلاقات الجهات لقسم الاحتياجات - إدارة المدفعية",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && node scripts/prebuild-clear-logs.mjs && next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
@@ -23,7 +23,8 @@
     "seed:crm": "tsx scripts/seed-crm.ts",
     "postinstall": "prisma generate",
     "migrate:turso": "tsx scripts/migrate-to-turso.ts",
-    "migrate:blob": "tsx scripts/migrate-storage-to-blob.ts"
+    "migrate:blob": "tsx scripts/migrate-storage-to-blob.ts",
+    "db:clear-logs": "tsx scripts/clear-logs.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
