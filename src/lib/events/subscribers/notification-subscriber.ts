@@ -128,6 +128,8 @@ function taskTitle(event: DomainEvent): string {
       return `اكتملت مهمة: «${name}»`;
     case EVENT_NAMES.TaskCancelled:
       return `تم إلغاء مهمة مُسنَدة إليك: «${name}»`;
+    case EVENT_NAMES.TaskDeleted:
+      return `تم حذف مهمة مُسنَدة إليك: «${name}»`;
     default:
       return name;
   }
@@ -164,6 +166,7 @@ const TASK_EVENTS = [
   EVENT_NAMES.TaskUpdated,
   EVENT_NAMES.TaskCompleted,
   EVENT_NAMES.TaskCancelled,
+  EVENT_NAMES.TaskDeleted,
 ] as const;
 
 export function registerNotificationSubscriber(bus: EventBus): void {

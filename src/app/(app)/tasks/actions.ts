@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import {
   changeMyTaskStatus,
   createTask,
+  deleteTask,
   updateTask,
 } from "@/lib/tasks/service";
 import { subjectMeta } from "@/lib/approvals/subjects";
@@ -105,6 +106,29 @@ export async function updateTaskAction(
  * Assignee self-service status change (start / hold / complete). Plain action
  * used by single-button forms in "مهامي"; failures revalidate silently.
  */
+export async function deleteTaskAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const user = await requireUser();
+
+  const taskId = String(formData.get("taskId") ?? "");
+  if (!taskId) return errorState("طلب غير صالح");
+
+  const entityType = String(formData.get("entityType") ?? "");
+  const entityId = String(formData.get("entityId") ?? "");
+
+  try {
+    await deleteTask(taskId, { id: user.id, role: user.role });
+    revalidateTaskSurfaces(entityType, entityId);
+    return { ok: true, message: "تم حذف المهمة بنجاح" };
+  } catch (error) {
+    if (error instanceof AppError) return errorState(error.message);
+    console.error("[tasks.delete] unexpected error", error);
+    return errorState("حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى");
+  }
+}
+
 export async function setMyTaskStatusAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   const taskId = String(formData.get("taskId") ?? "");

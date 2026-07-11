@@ -283,6 +283,21 @@ export async function updateTask(
   return task;
 }
 
+/**
+ * Permanently remove a task. Manager-only. Emits task.deleted (audit +
+ * assignee notification) before the row is deleted. Unlike CANCELLED status,
+ * deletion removes the task from all lists and search.
+ */
+export async function deleteTask(taskId: string, actor: Actor): Promise<void> {
+  requireManager(actor);
+
+  const existing = await prisma.task.findUnique({ where: { id: taskId } });
+  if (!existing) throw new NotFoundError("المهمة غير موجودة");
+
+  await emitTaskEvent(EVENT_NAMES.TaskDeleted, existing, actor.id);
+  await prisma.task.delete({ where: { id: taskId } });
+}
+
 function pickUpdateEvent(
   statusChangedTo: TaskStatus | null,
   assigneeChanged: boolean,

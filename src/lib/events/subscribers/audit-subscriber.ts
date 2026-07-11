@@ -64,6 +64,7 @@ const ACTION_BY_EVENT: Partial<Record<string, AuditAction>> = {
   [EVENT_NAMES.TaskUpdated]: AUDIT_ACTIONS.TASK_UPDATED,
   [EVENT_NAMES.TaskCompleted]: AUDIT_ACTIONS.TASK_COMPLETED,
   [EVENT_NAMES.TaskCancelled]: AUDIT_ACTIONS.TASK_CANCELLED,
+  [EVENT_NAMES.TaskDeleted]: AUDIT_ACTIONS.TASK_DELETED,
 };
 
 /** Metadata keys used only to build the summary — not stored on the audit row. */
@@ -186,6 +187,8 @@ function summaryFor(event: DomainEvent): string {
       return `إكمال مهمة: «${name}»`;
     case EVENT_NAMES.TaskCancelled:
       return `إلغاء مهمة: «${name}»`;
+    case EVENT_NAMES.TaskDeleted:
+      return `حذف مهمة: «${name}»`;
     default:
       return name || event.eventName;
   }

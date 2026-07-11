@@ -74,4 +74,65 @@
   .card {
     @apply rounded-card border border-line bg-white shadow-card;
   }
+
+  /* Glassmorphism surface */
+  .glass-surface {
+    @apply rounded-card border border-white/60 bg-white/70 shadow-card backdrop-blur-md;
+  }
+
+  /* Dashboard hero banner */
+  .dashboard-hero {
+    @apply relative overflow-hidden rounded-card bg-gradient-hero p-6 text-white shadow-panel;
+  }
+  .dashboard-hero::before {
+    content: "";
+    @apply pointer-events-none absolute inset-0 opacity-30;
+    background:
+      radial-gradient(circle at 20% 50%, rgba(6, 182, 212, 0.25) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.20) 0%, transparent 45%);
+  }
+  .dashboard-hero::after {
+    content: "";
+    @apply pointer-events-none absolute -end-8 -top-8 h-40 w-40 rounded-full opacity-20;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, transparent 70%);
+  }
+
+  /* Section heading with accent line */
+  .section-heading {
+    @apply relative pe-3 text-sm font-semibold text-brand-900;
+  }
+  .section-heading::after {
+    content: "";
+    @apply absolute -bottom-1 start-0 h-0.5 w-8 rounded-full bg-gradient-to-l from-brand-500 to-accent-cyan;
+  }
+
+  /* Stat card with gradient top accent */
+  .stat-card {
+    @apply relative overflow-hidden rounded-card border border-line/80 bg-white/80 p-4 shadow-card backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card-hover;
+  }
+  .stat-card::before {
+    content: "";
+    @apply absolute inset-x-0 top-0 h-1 rounded-t-card;
+  }
+
+  /* CRM module card */
+  .crm-module-card {
+    @apply group relative overflow-hidden rounded-card border border-line/60 bg-white/75 p-4 shadow-card backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-card-hover;
+  }
+  .crm-module-card::before {
+    content: "";
+    @apply absolute inset-x-0 top-0 h-0.5 opacity-60 transition-opacity duration-300 group-hover:opacity-100;
+  }
+
+  /* Activity timeline dot */
+  .activity-dot {
+    @apply relative mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full;
+    background: linear-gradient(135deg, #4f83cc, #06b6d4);
+    box-shadow: 0 0 6px rgba(6, 182, 212, 0.5);
+  }
+
+  /* Link pill for section "view all" */
+  .section-link {
+    @apply flex items-center gap-1 rounded-lg px-2.5 py-1 text-sm text-brand-600 transition-colors hover:bg-brand-50 hover:text-brand-700;
+  }
 }

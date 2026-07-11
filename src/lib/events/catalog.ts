@@ -63,6 +63,7 @@ export const EVENT_NAMES = {
   TaskUpdated: "task.updated",
   TaskCompleted: "task.completed",
   TaskCancelled: "task.cancelled",
+  TaskDeleted: "task.deleted",
 } as const;
 
 /** Union of every valid event name. */

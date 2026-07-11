@@ -16,13 +16,13 @@ import {
   CheckCircle2,
   XCircle,
   ListChecks,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/prisma";
 import { approvalCounts } from "@/lib/approvals/service";
 import { openTaskCount } from "@/lib/tasks/service";
-import { PageHeader } from "@/components/ui/page-header";
 import {
   formatFileSize,
   toArabicDigits,
@@ -143,11 +143,40 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <>
-      <PageHeader
-        title={`أهلًا، ${user.name}`}
-        description={`${ROLE_LABELS[user.role]} · لوحة المتابعة العامة للنظام`}
-      />
+    <div className="animate-fade-in-up space-y-8">
+      {/* Hero welcome banner */}
+      <div className="dashboard-hero">
+        <div className="relative z-10 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="mb-1 flex items-center gap-2 text-brand-200">
+              <Sparkles className="h-4 w-4 text-accent-cyan-light" aria-hidden />
+              <span className="text-xs font-medium tracking-wide">
+                لوحة المتابعة العامة
+              </span>
+            </div>
+            <h1 className="text-2xl font-bold text-white">
+              أهلًا، {user.name}
+            </h1>
+            <p className="mt-1.5 text-sm text-brand-200">
+              {ROLE_LABELS[user.role]} · نظرة شاملة على النظام
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <HeroStat
+              label="المجلدات"
+              value={toArabicDigits(String(folderCount))}
+            />
+            <HeroStat
+              label="الوثائق"
+              value={toArabicDigits(String(documentCount))}
+            />
+            <HeroStat
+              label="المستخدمون"
+              value={toArabicDigits(String(activeUsers))}
+            />
+          </div>
+        </div>
+      </div>
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -177,25 +206,33 @@ export default async function DashboardPage() {
         />
       </div>
 
-      {/* CRM modules — statistics + quick shortcuts to every data module */}
-      <section className="mt-8">
-        <h2 className="mb-3 text-sm font-semibold text-brand-900">
-          إدارة البيانات
-        </h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      {/* CRM modules */}
+      <section>
+        <SectionHeader title="إدارة البيانات" />
+        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {crmModules.map((mod) => {
             const Icon = mod.icon;
             return (
               <Link
                 key={mod.href}
                 href={mod.href}
-                className="rounded-card border border-line bg-white p-4 shadow-card transition-shadow hover:shadow-panel"
+                className="crm-module-card"
+                style={
+                  {
+                    "--module-color": mod.color,
+                  } as React.CSSProperties
+                }
               >
                 <span
-                  className="flex h-10 w-10 items-center justify-center rounded-lg"
+                  className="absolute inset-x-0 top-0 h-0.5 opacity-60 transition-opacity duration-300 group-hover:opacity-100"
+                  style={{ background: `linear-gradient(90deg, ${mod.color}, ${mod.color}88)` }}
+                />
+                <span
+                  className="flex h-10 w-10 items-center justify-center rounded-lg ring-1 ring-black/5"
                   style={{
                     backgroundColor: `${mod.color}18`,
                     color: mod.color,
+                    boxShadow: `0 0 12px -2px ${mod.color}40`,
                   }}
                 >
                   <Icon className="h-5 w-5" aria-hidden />
@@ -211,18 +248,13 @@ export default async function DashboardPage() {
       </section>
 
       {/* Approval workflow summary */}
-      <section className="mt-8">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-brand-900">الاعتمادات</h2>
-          <Link
-            href="/approvals"
-            className="flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700"
-          >
-            عرض الكل
-            <ArrowLeft className="h-4 w-4" aria-hidden />
-          </Link>
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <section>
+        <SectionHeader
+          title="الاعتمادات"
+          href="/approvals"
+          linkLabel="عرض الكل"
+        />
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <ApprovalCard
             href="/approvals"
             label="بانتظار المراجعة"
@@ -248,87 +280,79 @@ export default async function DashboardPage() {
       </section>
 
       {/* My open tasks */}
-      <section className="mt-8">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-brand-900">مهامي</h2>
-          <Link
+      <section>
+        <SectionHeader title="مهامي" href="/tasks" linkLabel="عرض الكل" />
+        <div className="mt-4">
+          <ApprovalCard
             href="/tasks"
-            className="flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700"
-          >
-            عرض الكل
-            <ArrowLeft className="h-4 w-4" aria-hidden />
-          </Link>
+            label="مهام مفتوحة مُسنَدة إليك"
+            value={toArabicDigits(String(myOpenTasks))}
+            icon={<ListChecks className="h-5 w-5" />}
+            tone="amber"
+          />
         </div>
-        <ApprovalCard
-          href="/tasks"
-          label="مهام مفتوحة مُسنَدة إليك"
-          value={toArabicDigits(String(myOpenTasks))}
-          icon={<ListChecks className="h-5 w-5" />}
-          tone="amber"
-        />
       </section>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-3">
         {/* Quick access to core folders */}
         <section className="lg:col-span-2">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-brand-900">
-              الوصول السريع
-            </h2>
-            <Link
-              href="/folders"
-              className="flex items-center gap-1 text-sm text-brand-600 hover:text-brand-700"
-            >
-              عرض الكل
-              <ArrowLeft className="h-4 w-4" aria-hidden />
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {coreFolders.map((folder) => (
-              <Link
-                key={folder.id}
-                href={`/folders/${folder.id}`}
-                className="flex items-center gap-3 rounded-card border border-line bg-white p-4 shadow-card transition-shadow hover:shadow-panel"
-              >
-                <span
-                  className="flex h-10 w-10 items-center justify-center rounded-lg"
-                  style={{
-                    backgroundColor: `${folder.color ?? "#2f66b5"}18`,
-                    color: folder.color ?? "#2f66b5",
-                  }}
+          <SectionHeader
+            title="الوصول السريع"
+            href="/folders"
+            linkLabel="عرض الكل"
+          />
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {coreFolders.map((folder) => {
+              const color = folder.color ?? "#2f66b5";
+              return (
+                <Link
+                  key={folder.id}
+                  href={`/folders/${folder.id}`}
+                  className="group flex items-center gap-3 rounded-card border border-line/60 bg-white/75 p-4 shadow-card backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-card-hover"
                 >
-                  <FolderIcon className="h-5 w-5" aria-hidden />
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate font-medium text-brand-900">
-                    {folder.name}
-                  </p>
-                  {folder.description && (
-                    <p className="truncate text-xs text-slate-500">
-                      {folder.description}
+                  <span
+                    className="flex h-10 w-10 items-center justify-center rounded-lg ring-1 ring-black/5 transition-shadow duration-300 group-hover:shadow-glow"
+                    style={{
+                      backgroundColor: `${color}18`,
+                      color,
+                      boxShadow: `0 0 10px -2px ${color}35`,
+                    }}
+                  >
+                    <FolderIcon className="h-5 w-5" aria-hidden />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-brand-900">
+                      {folder.name}
                     </p>
-                  )}
-                </div>
-              </Link>
-            ))}
+                    {folder.description && (
+                      <p className="truncate text-xs text-slate-500">
+                        {folder.description}
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </section>
 
         {/* Recent activity */}
         <section>
-          <h2 className="mb-3 text-sm font-semibold text-brand-900">
-            آخر النشاطات
-          </h2>
-          <div className="rounded-card border border-line bg-white p-2 shadow-card">
+          <SectionHeader title="آخر النشاطات" />
+          <div className="mt-4 glass-surface overflow-hidden p-2">
             {recentActivity.length === 0 ? (
               <p className="px-3 py-6 text-center text-sm text-slate-400">
                 لا توجد نشاطات بعد
               </p>
             ) : (
-              <ul className="divide-y divide-line">
-                {recentActivity.map((entry) => (
-                  <li key={entry.id} className="flex gap-3 px-3 py-3">
-                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-400" />
+              <ul className="divide-y divide-line/60">
+                {recentActivity.map((entry, idx) => (
+                  <li
+                    key={entry.id}
+                    className="flex gap-3 px-3 py-3 transition-colors hover:bg-brand-50/50"
+                    style={{ animationDelay: `${idx * 60}ms` }}
+                  >
+                    <span className="activity-dot" />
                     <div className="min-w-0">
                       <p className="text-sm text-brand-900">
                         {entry.summary ??
@@ -336,7 +360,8 @@ export default async function DashboardPage() {
                           entry.action}
                       </p>
                       <p className="text-xs text-slate-400">
-                        {entry.user?.name ?? "النظام"} · {timeAgo(entry.createdAt)}
+                        {entry.user?.name ?? "النظام"} ·{" "}
+                        {timeAgo(entry.createdAt)}
                       </p>
                     </div>
                   </li>
@@ -346,15 +371,58 @@ export default async function DashboardPage() {
           </div>
         </section>
       </div>
-    </>
+    </div>
   );
 }
 
-const TONES = {
-  brand: "bg-brand-50 text-brand-600",
-  green: "bg-green-50 text-green-600",
-  amber: "bg-amber-50 text-amber-600",
-  violet: "bg-violet-50 text-violet-600",
+function HeroStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-white/10 px-4 py-2.5 text-center ring-1 ring-white/20 backdrop-blur-sm">
+      <p className="text-lg font-bold text-white">{value}</p>
+      <p className="text-xs text-brand-200">{label}</p>
+    </div>
+  );
+}
+
+function SectionHeader({
+  title,
+  href,
+  linkLabel,
+}: {
+  title: string;
+  href?: string;
+  linkLabel?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <h2 className="section-heading pb-1">{title}</h2>
+      {href && linkLabel && (
+        <Link href={href} className="section-link">
+          {linkLabel}
+          <ArrowLeft className="h-4 w-4" aria-hidden />
+        </Link>
+      )}
+    </div>
+  );
+}
+
+const STAT_TONES = {
+  brand: {
+    bar: "bg-gradient-to-l from-brand-500 to-brand-400",
+    icon: "bg-brand-50 text-brand-600 shadow-glow",
+  },
+  green: {
+    bar: "bg-gradient-to-l from-emerald-500 to-accent-emerald",
+    icon: "bg-emerald-50 text-emerald-600 shadow-glow-green",
+  },
+  amber: {
+    bar: "bg-gradient-to-l from-amber-500 to-accent-amber",
+    icon: "bg-amber-50 text-amber-600 shadow-glow-amber",
+  },
+  violet: {
+    bar: "bg-gradient-to-l from-violet-500 to-accent-violet",
+    icon: "bg-violet-50 text-violet-600 shadow-glow-violet",
+  },
 } as const;
 
 function StatCard({
@@ -366,13 +434,15 @@ function StatCard({
   icon: React.ReactNode;
   label: string;
   value: string;
-  tone: keyof typeof TONES;
+  tone: keyof typeof STAT_TONES;
 }) {
+  const t = STAT_TONES[tone];
   return (
-    <div className="rounded-card border border-line bg-white p-4 shadow-card">
+    <div className="stat-card">
+      <span className={`absolute inset-x-0 top-0 h-1 rounded-t-card ${t.bar}`} />
       <div className="flex items-center justify-between">
         <span
-          className={`flex h-10 w-10 items-center justify-center rounded-lg ${TONES[tone]}`}
+          className={`flex h-10 w-10 items-center justify-center rounded-lg ${t.icon}`}
         >
           {icon}
         </span>
@@ -384,9 +454,18 @@ function StatCard({
 }
 
 const APPROVAL_TONES = {
-  amber: "bg-amber-50 text-amber-600",
-  green: "bg-green-50 text-green-600",
-  red: "bg-red-50 text-red-600",
+  amber: {
+    icon: "bg-amber-50 text-amber-600 shadow-glow-amber",
+    border: "hover:border-amber-200",
+  },
+  green: {
+    icon: "bg-emerald-50 text-emerald-600 shadow-glow-green",
+    border: "hover:border-emerald-200",
+  },
+  red: {
+    icon: "bg-red-50 text-red-600 shadow-glow-red",
+    border: "hover:border-red-200",
+  },
 } as const;
 
 function ApprovalCard({
@@ -402,21 +481,20 @@ function ApprovalCard({
   value: string;
   tone: keyof typeof APPROVAL_TONES;
 }) {
+  const t = APPROVAL_TONES[tone];
   return (
     <Link
       href={href}
-      className="rounded-card border border-line bg-white p-4 shadow-card transition-shadow hover:shadow-panel"
+      className={`group flex items-center gap-3 rounded-card border border-line/60 bg-white/75 p-4 shadow-card backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card-hover ${t.border}`}
     >
-      <div className="flex items-center gap-3">
-        <span
-          className={`flex h-10 w-10 items-center justify-center rounded-lg ${APPROVAL_TONES[tone]}`}
-        >
-          {icon}
-        </span>
-        <div>
-          <p className="text-2xl font-bold text-brand-900">{value}</p>
-          <p className="text-sm text-slate-500">{label}</p>
-        </div>
+      <span
+        className={`flex h-10 w-10 items-center justify-center rounded-lg transition-shadow duration-300 group-hover:shadow-glow ${t.icon}`}
+      >
+        {icon}
+      </span>
+      <div>
+        <p className="text-2xl font-bold text-brand-900">{value}</p>
+        <p className="text-sm text-slate-500">{label}</p>
       </div>
     </Link>
   );

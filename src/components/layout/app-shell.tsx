@@ -47,7 +47,8 @@ export function AppShell({ user, headerSlot, children }: AppShellProps) {
 
       {/* Main column */}
       <div className="flex min-h-screen flex-col">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-line bg-white/90 px-4 backdrop-blur sm:px-6">
+        <header className="relative sticky top-0 z-30 flex h-16 items-center justify-between border-b border-line/80 bg-white/80 px-4 backdrop-blur-md sm:px-6">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-l from-transparent via-brand-400/40 to-transparent" />
           <button
             type="button"
             onClick={() => setDrawerOpen((v) => !v)}
@@ -73,7 +74,7 @@ export function AppShell({ user, headerSlot, children }: AppShellProps) {
           </div>
         </header>
 
-        <main className={cn("flex-1 px-4 py-6 sm:px-6 lg:px-8")}>
+        <main className={cn("relative flex-1 bg-gradient-mesh px-4 py-6 sm:px-6 lg:px-8")}>
           {children}
         </main>
       </div>

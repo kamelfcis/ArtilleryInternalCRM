@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ModalProps {
   open: boolean;
@@ -9,6 +10,8 @@ interface ModalProps {
   title: string;
   description?: string;
   children: React.ReactNode;
+  /** Wider layout for rich content (e.g. document scanner). */
+  wide?: boolean;
 }
 
 /**
@@ -21,6 +24,7 @@ export function Modal({
   title,
   description,
   children,
+  wide,
 }: ModalProps) {
   useEffect(() => {
     if (!open) return;
@@ -49,7 +53,10 @@ export function Modal({
         onClick={onClose}
         aria-hidden
       />
-      <div className="relative flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col rounded-card border border-line bg-white shadow-overlay">
+      <div className={cn(
+        "relative flex max-h-[calc(100vh-2rem)] w-full flex-col rounded-card border border-line bg-white shadow-overlay",
+        wide ? "max-w-2xl" : "max-w-lg",
+      )}>
         <div className="flex shrink-0 items-start justify-between border-b border-line px-5 py-4">
           <div>
             <h2 className="text-base font-semibold text-brand-900">{title}</h2>

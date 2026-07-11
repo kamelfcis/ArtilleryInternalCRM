@@ -27,10 +27,13 @@ export function Sidebar({ role, onNavigate }: SidebarProps) {
   return (
     <nav
       aria-label="التنقل الرئيسي"
-      className="flex h-full flex-col bg-brand-900 text-brand-100"
+      className="relative flex h-full flex-col bg-gradient-sidebar text-brand-100"
     >
-      <div className="flex items-center gap-3 border-b border-white/10 px-5 py-5 text-white">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 ring-1 ring-white/20">
+      {/* Subtle accent glow along the inner edge */}
+      <div className="pointer-events-none absolute inset-y-0 start-0 w-px bg-gradient-to-b from-accent-cyan/30 via-brand-400/20 to-accent-violet/20" />
+
+      <div className="relative flex items-center gap-3 border-b border-white/10 px-5 py-5 text-white">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500/30 to-accent-cyan/20 ring-1 ring-white/25 shadow-glow-cyan">
           <ShieldCheck className="h-6 w-6" aria-hidden />
         </div>
         <div className="leading-tight">
@@ -63,12 +66,15 @@ export function Sidebar({ role, onNavigate }: SidebarProps) {
                         onClick={onNavigate}
                         aria-current={active ? "page" : undefined}
                         className={cn(
-                          "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                          "relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                           active
-                            ? "bg-white/10 text-white"
+                            ? "bg-white/10 text-white shadow-glow"
                             : "text-brand-200 hover:bg-white/5 hover:text-white",
                         )}
                       >
+                        {active && (
+                          <span className="absolute inset-y-1.5 end-0 w-0.5 rounded-full bg-gradient-to-b from-accent-cyan-light to-brand-400" />
+                        )}
                         <Icon className="h-5 w-5 shrink-0" aria-hidden />
                         <span>{item.label}</span>
                       </Link>

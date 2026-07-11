@@ -118,6 +118,7 @@ export const AUDIT_ACTIONS = {
   TASK_UPDATED: "TASK_UPDATED",
   TASK_COMPLETED: "TASK_COMPLETED",
   TASK_CANCELLED: "TASK_CANCELLED",
+  TASK_DELETED: "TASK_DELETED",
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
@@ -164,6 +165,7 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   TASK_UPDATED: "تحديث مهمة",
   TASK_COMPLETED: "إكمال مهمة",
   TASK_CANCELLED: "إلغاء مهمة",
+  TASK_DELETED: "حذف مهمة",
 } as const;
 
 // --- Entity types (for audit + generic references) -------------------------

@@ -1,11 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useFormState } from "react-dom";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Pencil, Clock } from "lucide-react";
+import { Plus, Pencil, Clock, Trash2, AlertCircle } from "lucide-react";
+import { Modal } from "@/components/ui/modal";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { TaskFormModal } from "./task-form-modal";
 import { TaskPriorityBadge, TaskStatusBadge } from "./task-badges";
 import { formatDate } from "@/lib/utils";
+import { initialActionState } from "@/lib/action-result";
+import { deleteTaskAction } from "@/app/(app)/tasks/actions";
 import type {
   AssignableUser,
   SubjectOption,
@@ -28,6 +34,7 @@ export function TaskManager({
 }) {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<TaskListItem | null>(null);
+  const [deleting, setDeleting] = useState<TaskListItem | null>(null);
 
   return (
     <>
@@ -112,14 +119,26 @@ export function TaskManager({
                     )}
                   </td>
                   <td className="px-4 py-3 text-end">
-                    <button
-                      type="button"
-                      onClick={() => setEditing(task)}
-                      className="btn-ghost p-2"
-                      aria-label="تعديل المهمة"
-                    >
-                      <Pencil className="h-4 w-4" aria-hidden />
-                    </button>
+                    <div className="flex justify-end gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setEditing(task)}
+                        className="btn-ghost p-2 text-slate-500 hover:text-brand-700"
+                        title="تعديل"
+                        aria-label="تعديل المهمة"
+                      >
+                        <Pencil className="h-4 w-4" aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeleting(task)}
+                        className="btn-ghost p-2 text-red-500 hover:bg-red-50"
+                        title="حذف"
+                        aria-label="حذف المهمة"
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -147,6 +166,60 @@ export function TaskManager({
           onClose={() => setEditing(null)}
         />
       )}
+
+      {deleting && (
+        <TaskDeleteModal task={deleting} onClose={() => setDeleting(null)} />
+      )}
     </>
+  );
+}
+
+function TaskDeleteModal({
+  task,
+  onClose,
+}: {
+  task: TaskListItem;
+  onClose: () => void;
+}) {
+  const [state, formAction] = useFormState(deleteTaskAction, initialActionState);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (state.ok) {
+      const t = setTimeout(() => {
+        onClose();
+        router.refresh();
+      }, 500);
+      return () => clearTimeout(t);
+    }
+  }, [state.ok, onClose, router]);
+
+  return (
+    <Modal open onClose={onClose} title="حذف المهمة">
+      <form action={formAction} className="space-y-4">
+        <input type="hidden" name="taskId" value={task.id} />
+        <input type="hidden" name="entityType" value={task.entityType} />
+        <input type="hidden" name="entityId" value={task.entityId} />
+        <p className="text-sm text-slate-600">
+          هل أنت متأكد من حذف{" "}
+          <span className="font-semibold text-brand-900">«{task.title}»</span>؟
+          لا يمكن التراجع عن هذا الإجراء.
+        </p>
+        {!state.ok && state.message && (
+          <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
+            <AlertCircle className="h-4 w-4 shrink-0" aria-hidden />
+            <span>{state.message}</span>
+          </div>
+        )}
+        <div className="flex justify-start gap-2">
+          <SubmitButton className="btn-danger" pendingLabel="جارٍ الحذف…">
+            حذف
+          </SubmitButton>
+          <button type="button" onClick={onClose} className="btn-secondary">
+            إلغاء
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

@@ -14,7 +14,6 @@ import {
   FileText,
   Lock,
 } from "lucide-react";
-import { DocumentIcon } from "@/components/ui/file-icon";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   CreateFolderDialog,
@@ -22,6 +21,8 @@ import {
   RenameDialog,
   DeleteDialog,
 } from "./dialogs";
+import { DocumentThumbnail } from "./document-thumbnail";
+import { DocumentPreviewModal } from "./document-preview-modal";
 import { formatFileSize, formatDate, toArabicDigits } from "@/lib/utils";
 import type {
   SubfolderView,
@@ -47,6 +48,13 @@ type DialogState =
       id: string;
       name: string;
       returnToParent?: boolean;
+    }
+  | {
+      type: "preview";
+      id: string;
+      name: string;
+      mimeType: string;
+      extension: string | null;
     }
   | null;
 
@@ -183,6 +191,15 @@ export function FolderExplorer({
                         doc={doc}
                         canEdit={canEdit}
                         canManage={canManage}
+                        onPreview={() =>
+                          setDialog({
+                            type: "preview",
+                            id: doc.id,
+                            name: doc.name,
+                            mimeType: doc.mimeType,
+                            extension: doc.extension,
+                          })
+                        }
                         onRename={() =>
                           setDialog({
                             type: "rename",
@@ -237,6 +254,16 @@ export function FolderExplorer({
           id={dialog.id}
           name={dialog.name}
           returnToParent={dialog.returnToParent}
+        />
+      )}
+      {dialog?.type === "preview" && (
+        <DocumentPreviewModal
+          open
+          onClose={close}
+          name={dialog.name}
+          contentUrl={`/api/documents/${dialog.id}/content`}
+          mimeType={dialog.mimeType}
+          extension={dialog.extension}
         />
       )}
     </div>
@@ -310,12 +337,14 @@ function DocumentRow({
   doc,
   canEdit,
   canManage,
+  onPreview,
   onRename,
   onDelete,
 }: {
   doc: DocumentView;
   canEdit: boolean;
   canManage: boolean;
+  onPreview: () => void;
   onRename: () => void;
   onDelete: () => void;
 }) {
@@ -326,16 +355,22 @@ function DocumentRow({
     <tr className="group hover:bg-surface-muted/60">
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
-          <DocumentIcon extension={doc.extension} />
+          <DocumentThumbnail
+            contentUrl={previewUrl}
+            mimeType={doc.mimeType}
+            extension={doc.extension}
+            name={doc.name}
+            size="sm"
+            onClick={onPreview}
+          />
           <div className="min-w-0">
-            <a
-              href={previewUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block truncate font-medium text-brand-900 hover:text-brand-600 hover:underline"
+            <button
+              type="button"
+              onClick={onPreview}
+              className="block truncate text-right font-medium text-brand-900 hover:text-brand-600 hover:underline"
             >
               {doc.name}
-            </a>
+            </button>
             <p className="text-xs text-slate-400">
               {(doc.extension ?? "").toUpperCase()}
               {doc.currentVersion > 1 &&
@@ -362,6 +397,14 @@ function DocumentRow({
           >
             <Download className="h-4 w-4" aria-hidden />
           </a>
+          <button
+            type="button"
+            onClick={onPreview}
+            className="btn-ghost p-2 text-slate-500 hover:text-brand-700"
+            title="معاينة"
+          >
+            <Eye className="h-4 w-4" aria-hidden />
+          </button>
           {(canEdit || canManage) && (
             <ItemMenu
               onRename={canEdit ? onRename : undefined}
