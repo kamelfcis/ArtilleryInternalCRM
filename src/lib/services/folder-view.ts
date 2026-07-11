@@ -19,6 +19,7 @@ export interface SubfolderView {
   childCount: number;
   documentCount: number;
   updatedAt: Date;
+  canManage: boolean;
 }
 
 export interface DocumentView {
@@ -148,6 +149,7 @@ export async function getFolderView(
         color: true,
         isSystem: true,
         updatedAt: true,
+        path: true,
       },
     }),
     // Documents always live inside a folder; the root itself holds none.
@@ -173,19 +175,27 @@ export async function getFolderView(
     rawSubfolders.map((f) => f.id),
   );
 
+  const subfolders = await Promise.all(
+    rawSubfolders.map(async (f) => {
+      const caps = await getFolderCapabilities(user, { id: f.id, path: f.path });
+      return {
+        id: f.id,
+        name: f.name,
+        description: f.description,
+        color: f.color,
+        isSystem: f.isSystem,
+        childCount: children.get(f.id) ?? 0,
+        documentCount: documents.get(f.id) ?? 0,
+        updatedAt: f.updatedAt,
+        canManage: caps.canManage,
+      };
+    }),
+  );
+
   return {
     folder: current,
     breadcrumbs,
-    subfolders: rawSubfolders.map((f) => ({
-      id: f.id,
-      name: f.name,
-      description: f.description,
-      color: f.color,
-      isSystem: f.isSystem,
-      childCount: children.get(f.id) ?? 0,
-      documentCount: documents.get(f.id) ?? 0,
-      updatedAt: f.updatedAt,
-    })),
+    subfolders,
     documents: rawDocuments.map((d) => ({
       id: d.id,
       name: d.name,

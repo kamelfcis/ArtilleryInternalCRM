@@ -30,6 +30,7 @@ import type {
 
 interface FolderExplorerProps {
   currentFolderId: string | null;
+  currentFolder?: { id: string; name: string; isSystem: boolean } | null;
   canEdit: boolean;
   canManage: boolean;
   subfolders: SubfolderView[];
@@ -40,11 +41,18 @@ type DialogState =
   | { type: "create" }
   | { type: "upload" }
   | { type: "rename"; kind: "folder" | "document"; id: string; name: string }
-  | { type: "delete"; kind: "folder" | "document"; id: string; name: string }
+  | {
+      type: "delete";
+      kind: "folder" | "document";
+      id: string;
+      name: string;
+      returnToParent?: boolean;
+    }
   | null;
 
 export function FolderExplorer({
   currentFolderId,
+  currentFolder,
   canEdit,
   canManage,
   subfolders,
@@ -80,6 +88,24 @@ export function FolderExplorer({
               رفع وثائق
             </button>
           )}
+          {canManage && currentFolder && !currentFolder.isSystem && (
+            <button
+              type="button"
+              onClick={() =>
+                setDialog({
+                  type: "delete",
+                  kind: "folder",
+                  id: currentFolder.id,
+                  name: currentFolder.name,
+                  returnToParent: true,
+                })
+              }
+              className="btn-danger"
+            >
+              <Trash2 className="h-4 w-4" aria-hidden />
+              حذف المجلد
+            </button>
+          )}
         </div>
       )}
 
@@ -107,7 +133,6 @@ export function FolderExplorer({
                   <FolderCard
                     key={folder.id}
                     folder={folder}
-                    canManage={canManage}
                     onRename={() =>
                       setDialog({
                         type: "rename",
@@ -211,6 +236,7 @@ export function FolderExplorer({
           kind={dialog.kind}
           id={dialog.id}
           name={dialog.name}
+          returnToParent={dialog.returnToParent}
         />
       )}
     </div>
@@ -230,12 +256,10 @@ function SectionTitle({ label, count }: { label: string; count: number }) {
 
 function FolderCard({
   folder,
-  canManage,
   onRename,
   onDelete,
 }: {
   folder: SubfolderView;
-  canManage: boolean;
   onRename: () => void;
   onDelete: () => void;
 }) {
@@ -275,7 +299,7 @@ function FolderCard({
         </div>
       </Link>
 
-      {canManage && !folder.isSystem && (
+      {folder.canManage && !folder.isSystem && (
         <ItemMenu onRename={onRename} onDelete={onDelete} />
       )}
     </div>

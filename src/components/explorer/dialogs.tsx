@@ -231,12 +231,14 @@ export function DeleteDialog({
   kind,
   id,
   name,
+  returnToParent,
 }: {
   open: boolean;
   onClose: () => void;
   kind: "folder" | "document";
   id: string;
   name: string;
+  returnToParent?: boolean;
 }) {
   const serverAction: ServerAction =
     kind === "folder" ? deleteFolderAction : deleteDocumentAction;
@@ -251,6 +253,9 @@ export function DeleteDialog({
     >
       <form action={action} className="space-y-4">
         <input type="hidden" name="id" value={id} />
+        {kind === "folder" && returnToParent && (
+          <input type="hidden" name="returnToParent" value="1" />
+        )}
         <p className="text-sm text-slate-600">
           هل أنت متأكد من نقل{" "}
           <span className="font-semibold text-brand-900">«{name}»</span> إلى

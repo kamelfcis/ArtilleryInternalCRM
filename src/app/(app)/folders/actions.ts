@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { canEdit, canManage, roleBaselineLevel } from "@/lib/authz";
@@ -31,6 +32,7 @@ import {
 function revalidateFolder(folderId: string | null) {
   revalidatePath("/folders");
   if (folderId) revalidatePath(`/folders/${folderId}`);
+  revalidatePath("/trash");
   revalidatePath("/");
 }
 
@@ -138,18 +140,30 @@ export async function deleteFolderAction(
   const id = String(formData.get("id") ?? "");
   if (!id) return errorState("معرّف المجلد مفقود");
 
+  const returnToParent = formData.get("returnToParent") === "1";
+  let redirectTo: string | undefined;
+
   try {
     const folder = await loadFolder(id);
     if (!folder) return errorState("المجلد غير موجود");
+    if (folder.isSystem) {
+      return errorState("لا يمكن حذف المجلدات الأساسية للنظام");
+    }
     if (!(await canManage(user, folder))) {
       return errorState("لا تملك صلاحية حذف هذا المجلد");
     }
     await softDeleteFolder(id, user.id);
     revalidateFolder(folder.parentId);
-    return { ok: true, message: "تم نقل المجلد إلى المحذوفات" };
+
+    if (returnToParent) {
+      redirectTo = folder.parentId ? `/folders/${folder.parentId}` : "/folders";
+    }
   } catch (error) {
     return toErrorState(error);
   }
+
+  if (redirectTo) redirect(redirectTo);
+  return { ok: true, message: "تم نقل المجلد إلى المحذوفات" };
 }
 
 // ---------------------------------------------------------------------------

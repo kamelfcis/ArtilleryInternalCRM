@@ -52,6 +52,11 @@ export default async function FolderPage({
       </PageHeader>
       <FolderExplorer
         currentFolderId={view.folder.id}
+        currentFolder={{
+          id: view.folder.id,
+          name: view.folder.name,
+          isSystem: view.folder.isSystem,
+        }}
         canEdit={view.capabilities.canEdit}
         canManage={view.capabilities.canManage}
         subfolders={view.subfolders}
