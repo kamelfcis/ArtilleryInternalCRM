@@ -7,6 +7,8 @@ import { AppError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+/** OCR + extraction can exceed the default 10s on Vercel. */
+export const maxDuration = 60;
 
 /** Max upload accepted for a scan (OCR of anything larger is impractical). */
 const MAX_BYTES = 15 * 1024 * 1024;

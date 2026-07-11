@@ -64,10 +64,13 @@ export function EntityFormModal({
   scan,
 }: EntityFormModalProps) {
   const [state, formAction] = useFormState(action, initialActionState);
-  // Values applied from a scan; bumping formKey remounts the (uncontrolled)
-  // field grid so the new defaults take effect.
-  const [scanValues, setScanValues] = useState<Record<string, string> | null>(null);
-  const [formKey, setFormKey] = useState(0);
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>(
+    () => initialValues ?? {},
+  );
+
+  useEffect(() => {
+    if (open) setFieldValues(initialValues ?? {});
+  }, [open, initialValues]);
 
   useEffect(() => {
     if (state.ok) {
@@ -76,7 +79,9 @@ export function EntityFormModal({
     }
   }, [state.ok, onClose]);
 
-  const effectiveValues = { ...(initialValues ?? {}), ...(scanValues ?? {}) };
+  function setFieldValue(name: string, value: string) {
+    setFieldValues((prev) => ({ ...prev, [name]: value }));
+  }
 
   return (
     <Modal open={open} onClose={onClose} title={title}>
@@ -87,18 +92,18 @@ export function EntityFormModal({
           <ScanPanel
             scan={scan}
             onFilled={(values) => {
-              setScanValues(values);
-              setFormKey((k) => k + 1);
+              setFieldValues((prev) => ({ ...prev, ...values }));
             }}
           />
         )}
 
-        <div key={formKey} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {fields.map((field) => (
             <FieldRenderer
               key={field.name}
               field={field}
-              defaultValue={effectiveValues[field.name] ?? ""}
+              value={fieldValues[field.name] ?? ""}
+              onChange={setFieldValue}
               error={state.fieldErrors?.[field.name]}
             />
           ))}
@@ -167,18 +172,57 @@ function ScanPanel({
       const body = new FormData();
       body.append("file", file);
       body.append("kind", scan.kind);
-      const res = await fetch(scan.endpoint, { method: "POST", body });
-      const data = (await res.json()) as {
+      const res = await fetch(scan.endpoint, {
+        method: "POST",
+        body,
+        credentials: "same-origin",
+      });
+
+      if (res.redirected) {
+        setResult({
+          ok: false,
+          text: "انتهت الجلسة. يرجى تسجيل الدخول مرة أخرى.",
+        });
+        return;
+      }
+
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        setResult({ ok: false, text: "استجابة غير متوقعة من الخادم" });
+        return;
+      }
+
+      let data: {
         values?: Record<string, string>;
         warnings?: string[];
         error?: string;
       };
+      try {
+        data = (await res.json()) as typeof data;
+      } catch {
+        setResult({ ok: false, text: "تعذّر قراءة استجابة الخادم" });
+        return;
+      }
+
       if (!res.ok) {
         setResult({ ok: false, text: data.error ?? "تعذّر تحليل المستند" });
         return;
       }
-      onFilled(data.values ?? {});
-      const filled = Object.keys(data.values ?? {}).length;
+
+      const values = data.values ?? {};
+      const filled = Object.keys(values).length;
+      if (filled === 0) {
+        const warn = data.warnings?.join(" · ");
+        setResult({
+          ok: false,
+          text:
+            warn ??
+            "لم يُستخرج أي حقل من المستند. جرّب صورة أوضح أو ملفًا مختلفًا.",
+        });
+        return;
+      }
+
+      onFilled(values);
       const warn = data.warnings?.length ? ` — ${data.warnings.join(" · ")}` : "";
       setResult({ ok: true, text: `تم تعبئة ${filled} حقلًا من المستند${warn}` });
     } catch {
@@ -245,7 +289,7 @@ function ScanPanel({
         />
       </div>
 
-      {fileName && !result && (
+      {fileName && !result && !busy && (
         <p className="mt-2 truncate text-xs text-slate-500">الملف: {fileName}</p>
       )}
       {result && (
@@ -270,11 +314,13 @@ function ScanPanel({
 
 function FieldRenderer({
   field,
-  defaultValue,
+  value,
+  onChange,
   error,
 }: {
   field: FormField;
-  defaultValue: string;
+  value: string;
+  onChange: (name: string, value: string) => void;
   error?: string[];
 }) {
   const id = `field-${field.name}`;
@@ -291,7 +337,8 @@ function FieldRenderer({
         <textarea
           id={id}
           name={field.name}
-          defaultValue={defaultValue}
+          value={value}
+          onChange={(e) => onChange(field.name, e.target.value)}
           rows={3}
           placeholder={field.placeholder}
           className="field-input resize-none"
@@ -300,7 +347,8 @@ function FieldRenderer({
         <select
           id={id}
           name={field.name}
-          defaultValue={defaultValue}
+          value={value}
+          onChange={(e) => onChange(field.name, e.target.value)}
           className="field-input"
         >
           {!field.required && <option value="">— بدون —</option>}
@@ -328,7 +376,8 @@ function FieldRenderer({
           step={field.type === "money" ? "0.01" : undefined}
           min={field.type === "money" ? "0" : undefined}
           dir={field.dir}
-          defaultValue={defaultValue}
+          value={value}
+          onChange={(e) => onChange(field.name, e.target.value)}
           placeholder={field.placeholder}
           className="field-input"
         />

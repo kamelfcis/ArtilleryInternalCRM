@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { canView } from "@/lib/authz";
 import { openReadStream } from "@/lib/storage";
+import { documentDownloadFilename } from "@/lib/utils";
 import { emitEvent, EVENT_NAMES } from "@/lib/events";
 import { ENTITY_TYPES } from "@/lib/constants";
 
@@ -31,6 +32,7 @@ export async function GET(
       id: true,
       name: true,
       originalName: true,
+      extension: true,
       mimeType: true,
       size: true,
       storageKey: true,
@@ -69,7 +71,9 @@ export async function GET(
   }
 
   const webStream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
-  const filename = encodeURIComponent(document.originalName);
+  const filename = encodeURIComponent(
+    documentDownloadFilename(document.name, document.extension),
+  );
   const disposition = isDownload ? "attachment" : "inline";
 
   return new NextResponse(webStream, {

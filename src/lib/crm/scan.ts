@@ -186,14 +186,18 @@ export async function scanForEntity(input: ScanInput): Promise<ScanResult> {
     warnings.push(`تعذّر مطابقة الشركة «${companyName}» بسجل موجود — اخترها يدويًا.`);
   }
 
-  // Title: no dedicated extracted field — use the works subject (project) or notes.
-  const titleSource = projectName ?? best(fields, FIELD_KEYS.NOTES)?.value ?? "";
+  // Title: prefer project scope, else supplier name, else notes, else the number.
+  const titleSource =
+    projectName ??
+    companyName ??
+    best(fields, FIELD_KEYS.NOTES)?.value ??
+    numberValue;
   const title = titleSource.trim().slice(0, MAX_TITLE);
 
   const description = best(fields, FIELD_KEYS.NOTES)?.value.trim() ?? "";
   const money = moneyValue(best(fields, FIELD_KEYS.AMOUNT));
   const currencyRaw = best(fields, FIELD_KEYS.CURRENCY)?.normalizedValue ?? "";
-  const currency = CURRENCY_VALUES.has(currencyRaw) ? currencyRaw : "";
+  const currency = CURRENCY_VALUES.has(currencyRaw) ? currencyRaw : money ? "EGP" : "";
   const date = dateValue(best(fields, FIELD_KEYS.DATE));
 
   const values: Record<string, string> = isContract

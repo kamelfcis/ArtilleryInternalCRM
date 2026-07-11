@@ -97,6 +97,39 @@ export function getExtension(filename: string): string {
   return filename.slice(idx + 1).toLowerCase();
 }
 
+/** Filename stem without the last dotted extension. */
+export function stemFromFilename(filename: string): string {
+  const idx = filename.lastIndexOf(".");
+  return idx > 0 ? filename.slice(0, idx) : filename;
+}
+
+/**
+ * Remove a trailing extension from a display name when it duplicates the stored
+ * extension column (users often type "تقرير.pdf" while extension is "pdf").
+ */
+export function stripTrailingExtension(
+  name: string,
+  extension?: string | null,
+): string {
+  const trimmed = name.trim();
+  if (!extension) return trimmed;
+  const suffix = `.${extension.toLowerCase()}`;
+  if (trimmed.toLowerCase().endsWith(suffix)) {
+    const stem = trimmed.slice(0, -suffix.length).trim();
+    return stem || trimmed;
+  }
+  return trimmed;
+}
+
+/** Build a UTF-8 download filename from display name + extension. */
+export function documentDownloadFilename(
+  name: string,
+  extension?: string | null,
+): string {
+  const stem = stripTrailingExtension(name, extension);
+  return extension ? `${stem}.${extension}` : stem;
+}
+
 /**
  * Sanitize a user-supplied name by removing filesystem-unsafe characters
  * (< > : " / \ | ? *) and collapsing whitespace. Arabic letters, digits and

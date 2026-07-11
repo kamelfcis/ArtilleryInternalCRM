@@ -26,7 +26,7 @@ import {
   imageFileToPdf,
   previewUrlForFile,
 } from "@/lib/document-scan";
-import { cn, formatFileSize, getExtension } from "@/lib/utils";
+import { cn, formatFileSize, getExtension, stemFromFilename } from "@/lib/utils";
 import { DocumentThumbnail } from "./document-thumbnail";
 
 type ServerAction = (
@@ -69,11 +69,6 @@ interface PendingFile {
   file: File;
   previewUrl: string;
   displayName: string;
-}
-
-function stemFromFilename(filename: string): string {
-  const idx = filename.lastIndexOf(".");
-  return idx > 0 ? filename.slice(0, idx) : filename;
 }
 
 function fileWithDisplayName(file: File, displayName: string): File {
@@ -178,10 +173,19 @@ export function UploadDialog({
       <form
         ref={formRef}
         action={action}
+        acceptCharset="UTF-8"
         onSubmit={handleSubmit}
         className="space-y-4"
       >
         <input type="hidden" name="folderId" value={folderId} />
+        {pending.map((item) => (
+          <input
+            key={`dn-${item.id}`}
+            type="hidden"
+            name="displayNames"
+            value={item.displayName}
+          />
+        ))}
 
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <label
@@ -404,7 +408,12 @@ export function RenameDialog({
   const serverAction: ServerAction =
     kind === "folder" ? renameFolderAction : renameDocumentAction;
   const [state, action] = useFormState(serverAction, initialActionState);
+  const [name, setName] = useState(currentName);
   useCloseOnSuccess(state.ok, onClose);
+
+  useEffect(() => {
+    if (open) setName(currentName);
+  }, [open, currentName, id]);
 
   return (
     <Modal
@@ -412,7 +421,7 @@ export function RenameDialog({
       onClose={onClose}
       title={kind === "folder" ? "إعادة تسمية المجلد" : "إعادة تسمية الوثيقة"}
     >
-      <form action={action} className="space-y-4">
+      <form key={`rename-${kind}-${id}`} action={action} acceptCharset="UTF-8" className="space-y-4">
         <input type="hidden" name="id" value={id} />
         <div>
           <label htmlFor="rename-input" className="field-label">
@@ -421,8 +430,10 @@ export function RenameDialog({
           <input
             id="rename-input"
             name="name"
-            defaultValue={currentName}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             className="field-input"
+            dir="auto"
             autoFocus
           />
           {state.fieldErrors?.name && (

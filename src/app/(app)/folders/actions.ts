@@ -192,12 +192,19 @@ export async function uploadDocumentAction(
 
     let uploaded = 0;
     const failures: string[] = [];
-    for (const file of files) {
+    const displayNames = formData
+      .getAll("displayNames")
+      .map((v) => (typeof v === "string" ? v.trim() : ""));
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!file) continue;
       try {
         const buffer = Buffer.from(await file.arrayBuffer());
         await uploadDocument({
           folderId,
           originalName: file.name,
+          displayName: displayNames[i] || undefined,
           buffer,
           declaredMime: file.type || undefined,
           uploadedById: user.id,

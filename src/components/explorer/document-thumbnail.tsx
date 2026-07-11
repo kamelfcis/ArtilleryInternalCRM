@@ -5,6 +5,7 @@ import { FileText, Loader2 } from "lucide-react";
 import { DocumentIcon } from "@/components/ui/file-icon";
 import { cn } from "@/lib/utils";
 import { isImageMime, isPdfMime } from "@/lib/document-scan";
+import { loadPdfjs } from "@/lib/pdf-viewer";
 
 interface DocumentThumbnailProps {
   /** Authorized content URL for stored documents. */
@@ -133,9 +134,7 @@ function PdfThumbnail({
 
     async function render() {
       try {
-        const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-        pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist/${pdfjs.version}/legacy/build/pdf.worker.min.mjs`;
-
+        const pdfjs = await loadPdfjs();
         let data: ArrayBuffer;
         if (file) {
           data = await file.arrayBuffer();

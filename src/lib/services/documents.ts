@@ -9,7 +9,12 @@ import {
 } from "@/lib/constants";
 import { MAX_UPLOAD_BYTES } from "@/lib/env";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/errors";
-import { getExtension, sanitizeName } from "@/lib/utils";
+import {
+  getExtension,
+  sanitizeName,
+  stemFromFilename,
+  stripTrailingExtension,
+} from "@/lib/utils";
 
 interface UploadInput {
   folderId: string;
@@ -44,9 +49,10 @@ export async function uploadDocument(input: UploadInput) {
   const mimeType =
     MIME_BY_EXTENSION[ext] ?? input.declaredMime ?? "application/octet-stream";
 
+  const rawDisplay =
+    input.displayName?.trim() || stemFromFilename(input.originalName);
   const displayName =
-    sanitizeName(input.displayName ?? input.originalName) ||
-    input.originalName;
+    sanitizeName(stripTrailingExtension(rawDisplay, ext)) || rawDisplay;
 
   const storageKey = await saveBuffer(input.buffer, ext);
 
@@ -167,7 +173,8 @@ export async function renameDocument(
   });
   if (!document) throw new NotFoundError("الوثيقة غير موجودة");
 
-  const name = sanitizeName(newName);
+  const raw = stripTrailingExtension(newName, document.extension);
+  const name = sanitizeName(raw);
   if (!name) throw new ConflictError("اسم الوثيقة غير صالح");
 
   await prisma.document.update({ where: { id }, data: { name } });

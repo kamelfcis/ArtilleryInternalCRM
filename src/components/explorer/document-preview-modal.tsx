@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { Download, ExternalLink, X } from "lucide-react";
 import { isImageMime, isPdfMime } from "@/lib/document-scan";
 import { cn } from "@/lib/utils";
+import { PdfDocumentViewer } from "./pdf-document-viewer";
 
 interface DocumentPreviewModalProps {
   open: boolean;
@@ -41,7 +42,6 @@ export function DocumentPreviewModal({
   const downloadUrl = `${contentUrl}?download=1`;
   const showImage = isImageMime(mimeType, extension);
   const showPdf = isPdfMime(mimeType, extension);
-  const pdfSrc = showPdf ? `${contentUrl}#view=FitH&zoom=page-width` : contentUrl;
 
   return (
     <div
@@ -62,7 +62,11 @@ export function DocumentPreviewModal({
         )}
       >
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-line px-3 py-3 sm:gap-3 sm:px-5 sm:py-4">
-          <h2 className="min-w-0 flex-1 truncate text-sm font-semibold text-brand-900 sm:text-base">
+          <h2
+            className="min-w-0 flex-1 truncate text-sm font-semibold text-brand-900 sm:text-base"
+            dir="auto"
+            title={name}
+          >
             {name}
           </h2>
           <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
@@ -104,13 +108,7 @@ export function DocumentPreviewModal({
               />
             </div>
           )}
-          {showPdf && (
-            <iframe
-              src={pdfSrc}
-              title={name}
-              className="min-h-0 w-full flex-1 rounded-lg border border-line bg-white shadow-card"
-            />
-          )}
+          {showPdf && <PdfDocumentViewer url={contentUrl} />}
           {!showImage && !showPdf && (
             <div className="flex flex-1 flex-col items-center justify-center gap-4 py-12 text-center">
               <p className="text-sm text-slate-600">
