@@ -52,6 +52,6 @@ export async function middleware(req: NextRequest) {
 export const config = {
   // Run on app routes only — API routes enforce their own auth and return JSON
   // errors instead of login redirects (needed for fetch-based scan, etc.).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|assets/|api/).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|assets/|api/|pdf\\.worker\\.min\\.mjs).*)"],
 };
 
