@@ -1,4 +1,4 @@
-﻿{
+{
   "buildCommand": "prisma generate && node scripts/prebuild-clear-logs.mjs && next build",
   "installCommand": "npm install"
 }
