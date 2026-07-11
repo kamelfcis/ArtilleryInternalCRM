@@ -1,0 +1,810 @@
+// ===========================================================================
+// نظام إدارة الوثائق وعلاقات الجهات
+// قسم الاحتياجات - إدارة المدفعية
+//
+// Data model for an enterprise document management system (DMS) that replaces
+// a Google Drive folder workflow. Entities mirror the department's real-world
+// structure: hierarchical Folders (business entities) containing Documents.
+//
+// Portability: no native enums / Postgres-only features are used so the exact
+// same schema runs on SQLite (local dev) and PostgreSQL (production). String
+// fields whose values are constrained are validated at the application layer
+// (see src/lib/constants.ts). To move to PostgreSQL, change `provider` below
+// and set DATABASE_URL accordingly — no schema edits required.
+// ===========================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// System user. Roles are coarse-grained (ADMIN/MANAGER/EDITOR/VIEWER);
+/// fine-grained access is layered on top via FolderPermission.
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         String    @default("VIEWER") // ADMIN | MANAGER | EDITOR | VIEWER
+  jobTitle     String? // المسمى الوظيفي
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  createdFolders     Folder[]           @relation("FolderCreatedBy")
+  uploadedDocuments  Document[]         @relation("DocumentUploadedBy")
+  uploadedVersions   DocumentVersion[]  @relation("VersionUploadedBy")
+  permissions        FolderPermission[] @relation("PermissionUser")
+  grantedPermissions FolderPermission[] @relation("PermissionGrantedBy")
+  auditLogs          AuditLog[]         @relation("AuditActor")
+
+  // CRM records authored by this user.
+  createdCompanies Company[]  @relation("CompanyCreatedBy")
+  createdContracts Contract[] @relation("ContractCreatedBy")
+  createdPractices Practice[] @relation("PracticeCreatedBy")
+  createdProjects  Project[]  @relation("ProjectCreatedBy")
+  createdSites     Site[]     @relation("SiteCreatedBy")
+  createdPurchases Purchase[] @relation("PurchaseCreatedBy")
+
+  // Approval workflow.
+  approvalsRequested  Approval[]           @relation("ApprovalRequestedBy")
+  approvalTransitions ApprovalTransition[] @relation("ApprovalTransitionActor")
+
+  // Notifications.
+  notifications      Notification[] @relation("NotificationRecipient")
+  notificationsActed Notification[] @relation("NotificationActor")
+
+  // Tasks / assignments.
+  tasksAssigned Task[] @relation("TaskAssignee")
+  tasksCreated  Task[] @relation("TaskAssignedBy")
+
+  // Document import jobs started by this user.
+  importJobs ImportJob[] @relation("ImportStartedBy")
+
+  @@index([role])
+}
+
+/// A folder in the document tree. Top-level folders (parentId = null) with
+/// isSystem = true represent the department's core business entities
+/// (الممارسات، التعاقدات، الشركات، ...). Self-referencing tree with a
+/// materialized `path` for efficient breadcrumb and subtree queries.
+model Folder {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  color       String? // optional UI accent (hex) for quick visual scanning
+
+  parentId String?
+  parent   Folder?  @relation("FolderTree", fields: [parentId], references: [id])
+  children Folder[] @relation("FolderTree")
+
+  /// Materialized path of ancestor ids incl. self, e.g. "/rootId/childId/".
+  path  String @default("/")
+  depth Int    @default(0)
+
+  /// System folders are seeded top-level entities that cannot be deleted or
+  /// renamed by ordinary users (only ADMIN), preserving the familiar structure.
+  isSystem Boolean @default(false)
+
+  createdById String
+  createdBy   User   @relation("FolderCreatedBy", fields: [createdById], references: [id])
+
+  documents   Document[]
+  permissions FolderPermission[]
+
+  // A folder may be the dedicated document folder of a CRM record (1:1).
+  company  Company?
+  contract Contract?
+  practice Practice?
+  project  Project?
+  site     Site?
+  purchase Purchase?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // soft delete → moves to "المحذوفات" (recycle bin)
+
+  @@index([parentId])
+  @@index([path])
+  @@index([deletedAt])
+}
+
+/// A document (typically a PDF) stored inside a folder. The row always points
+/// at the current version; historical versions live in DocumentVersion.
+model Document {
+  id             String  @id @default(cuid())
+  name           String // display name shown to users
+  originalName   String // original uploaded file name
+  extension      String? // "pdf", "docx", ...
+  mimeType       String
+  size           Int // bytes of the current version
+  storageKey     String // relative path of current version file on disk
+  currentVersion Int     @default(1)
+
+  folderId String
+  folder   Folder @relation(fields: [folderId], references: [id])
+
+  uploadedById String
+  uploadedBy   User   @relation("DocumentUploadedBy", fields: [uploadedById], references: [id])
+
+  versions DocumentVersion[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // soft delete
+
+  // Set when this document originated from a filesystem import (Phase 4.1).
+  importFile ImportFile? @relation("ImportFileDocument")
+
+  // Extracted text (Phase 4.2): one row per page/sheet. Empty until OCR runs.
+  texts DocumentText[]
+
+  // Structured AI extraction (Phase 4.3): at most one per document.
+  extraction DocumentExtraction?
+
+  // Suggested/confirmed CRM associations (Phase 4.4).
+  links DocumentLink[]
+
+  // CRM records bootstrapped from this document's extraction (Phase 5.1).
+  bootstrapProvenance CrmRecordProvenance[]
+
+  @@index([folderId])
+  @@index([deletedAt])
+}
+
+/// Immutable snapshot of a document revision. Enables full version history and
+/// rollback — an auditability requirement for government records.
+model DocumentVersion {
+  id         String   @id @default(cuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  version    Int
+  storageKey String
+  size       Int
+  mimeType   String
+  note       String? // ملاحظة الإصدار
+
+  uploadedById String
+  uploadedBy   User   @relation("VersionUploadedBy", fields: [uploadedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([documentId, version])
+  @@index([documentId])
+}
+
+/// Explicit access grant of a user to a folder subtree. Absence of a grant
+/// falls back to role-based defaults (see src/lib/authz.ts).
+model FolderPermission {
+  id       String @id @default(cuid())
+  folderId String
+  folder   Folder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation("PermissionUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  level String // VIEW | EDIT | MANAGE
+
+  grantedById String?
+  grantedBy   User?   @relation("PermissionGrantedBy", fields: [grantedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([folderId, userId])
+  @@index([userId])
+}
+
+/// Append-only audit trail. Every meaningful action is recorded for
+/// accountability and compliance. Never updated or deleted in normal operation.
+model AuditLog {
+  id String @id @default(cuid())
+
+  userId String?
+  user   User?   @relation("AuditActor", fields: [userId], references: [id])
+
+  action     String // LOGIN | LOGOUT | CREATE_FOLDER | RENAME_FOLDER | DELETE_FOLDER | UPLOAD_DOCUMENT | ...
+  entityType String? // FOLDER | DOCUMENT | USER | PERMISSION
+  entityId   String?
+  summary    String? // human-readable Arabic description
+  metadata   String? // JSON payload with extra context
+  ipAddress  String?
+  userAgent  String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// ===========================================================================
+// CRM — Business domain
+//
+// Normalized business entities that turn the platform from a file manager into
+// a real CRM. Each record optionally owns a dedicated document folder
+// (`folderId`, 1:1 with Folder) so employees keep browsing files the familiar
+// way while relationships live in the database. Money is stored as Decimal;
+// constrained string fields (status/currency) are validated in the app layer.
+// ===========================================================================
+
+/// A physical/operational site or location (e.g. الحديقة، السخنة، الدار).
+model Site {
+  id          String  @id @default(cuid())
+  name        String
+  code        String? // رمز الموقع
+  description String?
+  address     String?
+
+  folderId String? @unique
+  folder   Folder? @relation(fields: [folderId], references: [id])
+
+  createdById String
+  createdBy   User   @relation("SiteCreatedBy", fields: [createdById], references: [id])
+
+  projects Project[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([deletedAt])
+}
+
+/// A supplier/vendor company the department deals with.
+model Company {
+  id            String  @id @default(cuid())
+  name          String
+  code          String? // السجل التجاري / رمز الشركة
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  notes         String?
+  status        String  @default("ACTIVE") // ACTIVE | INACTIVE | BLACKLISTED
+
+  folderId String? @unique
+  folder   Folder? @relation(fields: [folderId], references: [id])
+
+  createdById String
+  createdBy   User   @relation("CompanyCreatedBy", fields: [createdById], references: [id])
+
+  contracts        Contract[]
+  purchases        Purchase[]
+  awardedPractices Practice[] @relation("PracticeAwardedCompany")
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([status])
+  @@index([deletedAt])
+}
+
+/// A project undertaken by the department, optionally located at a Site.
+model Project {
+  id          String    @id @default(cuid())
+  name        String
+  code        String?
+  description String?
+  status      String    @default("PLANNED") // PLANNED | ACTIVE | ON_HOLD | COMPLETED | CANCELLED
+  budget      Decimal?
+  startDate   DateTime?
+  endDate     DateTime?
+
+  siteId String?
+  site   Site?   @relation(fields: [siteId], references: [id])
+
+  folderId String? @unique
+  folder   Folder? @relation(fields: [folderId], references: [id])
+
+  createdById String
+  createdBy   User   @relation("ProjectCreatedBy", fields: [createdById], references: [id])
+
+  contracts Contract[]
+  purchases Purchase[]
+  practices Practice[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([status])
+  @@index([siteId])
+  @@index([deletedAt])
+}
+
+/// A procurement practice/tender (ممارسة). May be tied to a Project and may be
+/// awarded to a Company, which typically yields a Contract.
+model Practice {
+  id              String    @id @default(cuid())
+  referenceNumber String    @unique // رقم الممارسة
+  title           String
+  description     String?
+  status          String    @default("DRAFT") // DRAFT | OPEN | UNDER_REVIEW | AWARDED | CANCELLED
+  estimatedValue  Decimal?
+  openDate        DateTime?
+  closeDate       DateTime?
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  awardedCompanyId String?
+  awardedCompany   Company? @relation("PracticeAwardedCompany", fields: [awardedCompanyId], references: [id])
+
+  folderId String? @unique
+  folder   Folder? @relation(fields: [folderId], references: [id])
+
+  createdById String
+  createdBy   User   @relation("PracticeCreatedBy", fields: [createdById], references: [id])
+
+  contracts Contract[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([status])
+  @@index([projectId])
+  @@index([deletedAt])
+}
+
+/// A contract (تعاقد) with a supplier Company, optionally under a Project and/or
+/// resulting from a Practice.
+model Contract {
+  id             String    @id @default(cuid())
+  contractNumber String    @unique // رقم العقد
+  title          String
+  description    String?
+  status         String    @default("DRAFT") // DRAFT | ACTIVE | SUSPENDED | COMPLETED | TERMINATED
+  value          Decimal?
+  currency       String    @default("EGP")
+  signedDate     DateTime?
+  startDate      DateTime?
+  endDate        DateTime?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  practiceId String?
+  practice   Practice? @relation(fields: [practiceId], references: [id])
+
+  folderId String? @unique
+  folder   Folder? @relation(fields: [folderId], references: [id])
+
+  createdById String
+  createdBy   User   @relation("ContractCreatedBy", fields: [createdById], references: [id])
+
+  purchases Purchase[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([status])
+  @@index([companyId])
+  @@index([projectId])
+  @@index([deletedAt])
+}
+
+/// A purchase order (أمر شراء) from a supplier, optionally under a Project and/or
+/// Contract.
+model Purchase {
+  id             String    @id @default(cuid())
+  purchaseNumber String    @unique // رقم أمر الشراء
+  title          String
+  description    String?
+  status         String    @default("REQUESTED") // REQUESTED | APPROVED | ORDERED | RECEIVED | CANCELLED
+  amount         Decimal?
+  currency       String    @default("EGP")
+  requestDate    DateTime?
+  deliveryDate   DateTime?
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  contractId String?
+  contract   Contract? @relation(fields: [contractId], references: [id])
+
+  folderId String? @unique
+  folder   Folder? @relation(fields: [folderId], references: [id])
+
+  createdById String
+  createdBy   User   @relation("PurchaseCreatedBy", fields: [createdById], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([status])
+  @@index([companyId])
+  @@index([projectId])
+  @@index([deletedAt])
+}
+
+// ===========================================================================
+// Workflow & Approval Engine
+//
+// A generic, polymorphic approval that can be attached to ANY business entity
+// via (subjectType, subjectId) — Document, Company, Contract, Purchase,
+// Project, Practice, Site. The lifecycle (Draft → Submitted → Under Review →
+// Approved / Rejected → Archived) is a string field validated in the app layer
+// (src/lib/approvals). Every transition appends an immutable ApprovalTransition
+// row, giving a full, auditable approval history/timeline independent of the
+// global audit trail.
+// ===========================================================================
+
+/// One approval workflow record per business subject (its current state).
+model Approval {
+  id          String  @id @default(cuid())
+  subjectType String // DOCUMENT | COMPANY | CONTRACT | PURCHASE | PROJECT | PRACTICE | SITE
+  subjectId   String
+  /// Cached display title of the subject for lists/timelines.
+  title       String?
+  status      String  @default("DRAFT") // DRAFT | SUBMITTED | UNDER_REVIEW | APPROVED | REJECTED | ARCHIVED
+
+  requestedById String
+  requestedBy   User   @relation("ApprovalRequestedBy", fields: [requestedById], references: [id])
+
+  transitions ApprovalTransition[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([subjectType, subjectId])
+  @@index([status])
+  @@index([subjectType, subjectId])
+}
+
+// ===========================================================================
+// Notifications
+//
+// In-app notifications produced by the domain-event bus (a notification
+// subscriber, independent of audit). Delivery is in-app only — a bell in the
+// top bar + a dedicated page. Recipients are resolved per event by role/owner
+// (see src/lib/notifications). No email/SMS: the bus is in-process.
+// ===========================================================================
+
+/// A single in-app notification addressed to one recipient user.
+model Notification {
+  id String @id @default(cuid())
+
+  recipientId String
+  recipient   User   @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  type  String // originating event name, e.g. "approval.submitted"
+  title String // Arabic headline shown in the bell/list
+  body  String? // optional detail (e.g. reviewer's comment)
+  link  String? // in-app href to the subject (detail page)
+
+  /// The user whose action produced this notification (for display); may be null.
+  actorId String?
+  actor   User?   @relation("NotificationActor", fields: [actorId], references: [id])
+
+  entityType String? // APPROVAL | DOCUMENT | ...
+  entityId   String?
+
+  readAt    DateTime? // null = unread
+  createdAt DateTime  @default(now())
+
+  @@index([recipientId, readAt])
+  @@index([recipientId, createdAt])
+}
+
+/// Immutable record of a single approval state transition — the timeline.
+model ApprovalTransition {
+  id         String   @id @default(cuid())
+  approvalId String
+  approval   Approval @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+
+  action     String // SUBMIT | START_REVIEW | APPROVE | REJECT | RETURN | CANCEL | ARCHIVE | CREATE
+  fromStatus String
+  toStatus   String
+  comment    String?
+
+  actorId String
+  actor   User   @relation("ApprovalTransitionActor", fields: [actorId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([approvalId])
+  @@index([createdAt])
+}
+
+// ===========================================================================
+// Tasks / Assignments
+//
+// A generic assignment attachable to any CRM entity (Company | Project | Site |
+// Practice | Contract | Purchase) via a polymorphic (entityType, entityId) —
+// the same pattern as Approval's subject. A task is owned by one assignee and
+// created by an assigner (a manager). All lifecycle changes flow through the
+// task service, which emits task.* domain events; the audit + notification
+// subscribers react (no imperative audit/notify calls). See src/lib/tasks.
+// ===========================================================================
+
+/// A single task assigned to a user, optionally scoped to a CRM entity.
+model Task {
+  id String @id @default(cuid())
+
+  /// Polymorphic subject this task concerns (a CRM entity). Reuses the approval
+  /// subject registry for labels/links (src/lib/approvals/subjects.ts).
+  entityType String // COMPANY | PROJECT | SITE | PRACTICE | CONTRACT | PURCHASE
+  entityId   String
+  /// Cached display title of the subject for lists (denormalized like Approval).
+  entityTitle String?
+
+  title    String
+  notes    String?
+  priority String @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  status   String @default("NEW") // NEW | IN_PROGRESS | WAITING | COMPLETED | CANCELLED
+  dueDate  DateTime?
+
+  assigneeId String
+  assignee   User   @relation("TaskAssignee", fields: [assigneeId], references: [id])
+
+  assignedById String
+  assignedBy   User   @relation("TaskAssignedBy", fields: [assignedById], references: [id])
+
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([assigneeId, status])
+  @@index([entityType, entityId])
+  @@index([status])
+}
+
+// ===========================================================================
+// Document Import (Phase 4.1)
+//
+// Bulk import of the local "Documents" folder tree into the CRM. An ImportJob
+// is one run of the importer; ImportFile is the durable per-file ledger keyed
+// by content checksum (SHA-256) so imports are de-duplicated and resumable —
+// rerunning skips already-imported content. The importer reuses the existing
+// folder + document services (materialized-path folders, storage, and the
+// document.uploaded event that the audit subscriber records). See src/lib/import.
+// ===========================================================================
+
+/// One execution of the document importer over a source directory.
+model ImportJob {
+  id         String @id @default(cuid())
+  sourceRoot String // absolute path of the scanned source directory
+  status     String @default("PENDING") // PENDING | SCANNING | IMPORTING | COMPLETED | FAILED
+
+  totalFiles     Int @default(0) // files discovered by the scan
+  scannedFolders Int @default(0) // folders discovered by the scan
+  importedCount  Int @default(0)
+  skippedCount   Int @default(0)
+  failedCount    Int @default(0)
+
+  error String? // fatal error that aborted the job, if any
+
+  startedById String?
+  startedBy   User?   @relation("ImportStartedBy", fields: [startedById], references: [id])
+
+  files ImportFile[]
+
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  updatedAt  DateTime  @updatedAt
+
+  @@index([status])
+}
+
+/// Durable per-file import record. Unique by checksum => a given file content is
+/// imported at most once (dedup); status drives resumable reruns.
+model ImportFile {
+  id    String @id @default(cuid())
+  jobId String
+  job   ImportJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  relativePath String // path relative to the source root (POSIX separators)
+  originalName String
+  extension    String?
+  size         Int
+  checksum     String  @unique // SHA-256 of file bytes — the dedup key
+
+  sourceCreatedAt  DateTime? // filesystem birth time (when available)
+  sourceModifiedAt DateTime? // filesystem mtime
+
+  status String  @default("PENDING") // PENDING | IMPORTED | SKIPPED | FAILED
+  reason String? // why skipped/failed (Arabic, user-facing)
+
+  /// The document created for this file (1:1); null when skipped/failed.
+  documentId String?   @unique
+  document   Document? @relation("ImportFileDocument", fields: [documentId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([jobId])
+  @@index([status])
+  @@index([relativePath])
+}
+
+// ===========================================================================
+// Document OCR / Text Extraction (Phase 4.2)
+//
+// Raw text extracted from each document, stored once per page (PDF/image) or
+// per sheet (Excel). The pipeline extracts a PDF's embedded text layer when it
+// is genuinely readable, and otherwise rasterizes the page and runs Tesseract
+// OCR (Arabic + English). Extraction runs only once per document content:
+// `sourceHash` records the SHA-256 of the bytes the text was derived from, so a
+// rerun skips unchanged documents and re-extracts only when the file changed.
+// This is RAW text only — structured AI extraction is a later phase (4.3) and
+// never overwrites these rows. See src/lib/ocr.
+// ===========================================================================
+
+/// Extracted raw text for one page (PDF/image) or sheet (Excel) of a document.
+model DocumentText {
+  id         String @id @default(cuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  pageNumber Int    // 1-based page (PDF/image) or sheet index (Excel)
+  rawText    String // extracted text; empty string when nothing was extractable
+
+  /// Detected script of this page: "ara" | "eng" | "ara+eng" | "und".
+  language   String
+  /// 0–100. 100 for exact text-layer/office extraction; Tesseract's score for OCR.
+  confidence Float
+
+  /// Extraction method for this page: "text-layer" | "ocr" | "office" | "none".
+  method String @default("none")
+  /// SHA-256 of the document bytes this text was derived from (idempotency key).
+  sourceHash String
+
+  createdAt DateTime @default(now())
+
+  @@unique([documentId, pageNumber])
+  @@index([documentId])
+  @@index([sourceHash])
+}
+
+// ===========================================================================
+// Structured Information Extraction (Phase 4.3)
+//
+// Structured fields extracted FROM the OCR text (never modifying it). A hybrid
+// engine runs deterministic local rules (dates, phones, national/tax IDs,
+// amounts, contract/purchase/practice numbers) plus an optional LLM pass for
+// free-form entities (company, engineer, representative, site, project,
+// government entity, address, status, notes). Stored separately so CRM linking
+// (Phase 4.4) and the review queue (4.5) can consume it. Idempotent by
+// `sourceHash` (hash of the OCR text extracted from), like OCR. See
+// src/lib/extraction.
+// ===========================================================================
+
+/// One extraction run over a document's OCR text. At most one per document.
+model DocumentExtraction {
+  id         String @id @default(cuid())
+  documentId String @unique
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  /// Which passes produced the fields: "hybrid" (rules + LLM) | "rules-only".
+  engine String
+  /// LLM model id used for the free-form pass, or null when it did not run.
+  model  String?
+  /// SHA-256 of the concatenated OCR text this extraction was derived from.
+  sourceHash String
+
+  fields DocumentField[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sourceHash])
+}
+
+/// A single extracted field. Multi-valued fields (dates, phones, amounts…) are
+/// stored as multiple rows sharing the same `key`.
+model DocumentField {
+  id           String @id @default(cuid())
+  extractionId String
+  extraction   DocumentExtraction @relation(fields: [extractionId], references: [id], onDelete: Cascade)
+  /// Denormalized for querying fields directly by document (Phase 4.4 linking).
+  documentId   String
+
+  /// Field name from the extraction catalog (e.g. "company", "contractNumber").
+  key   String
+  /// Raw extracted value as it appears/was inferred.
+  value String
+  /// Canonical form when applicable (ISO date, digits-only phone), else null.
+  normalizedValue String?
+  /// 0–1 confidence. Rule hits are high; LLM values carry the model's estimate.
+  confidence Float
+  /// Which pass produced it: "rule" | "llm".
+  source String
+
+  createdAt DateTime @default(now())
+
+  @@index([extractionId])
+  @@index([documentId])
+  @@index([key])
+}
+
+/// A suggested (or human-confirmed) association between a Document and a CRM
+/// record (Phase 4.4). Polymorphic by (entityType, entityId) — mirroring the
+/// approval engine — so one table links documents to Contracts, Purchases,
+/// Practices, Companies, Projects and Sites. Links are DERIVED from the fields
+/// extracted in Phase 4.3 and are only ever *suggestions*: the linker never
+/// mutates the CRM record itself. A human confirms/rejects them in the Phase 4.5
+/// review queue, and re-running the linker preserves those human decisions and
+/// any MANUAL links (see src/lib/linking/service.ts).
+model DocumentLink {
+  id         String   @id @default(cuid())
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  /// CRM record kind, from ENTITY_TYPES: CONTRACT | PURCHASE | PRACTICE | COMPANY | PROJECT | SITE.
+  entityType String
+  /// Id of the linked CRM record (not a FK — polymorphic across six tables).
+  entityId   String
+
+  /// The DocumentField.key that produced the match (e.g. "contractNumber", "company").
+  matchedKey   String
+  /// The extracted value that matched the CRM record.
+  matchedValue String
+  /// How the match was made: "exact" (normalized identifier) | "fuzzy" (name).
+  method     String
+  /// 0–1 match strength. Exact identifier hits are high; fuzzy name hits vary.
+  confidence Float
+
+  /// Review state: SUGGESTED (default, awaiting review) | CONFIRMED | REJECTED.
+  status String @default("SUGGESTED")
+  /// Origin: AUTO (produced by the linker) | MANUAL (created by a user).
+  source String @default("AUTO")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([documentId, entityType, entityId])
+  @@index([documentId])
+  @@index([entityType, entityId])
+  @@index([status])
+}
+
+/// Provenance for a CRM record created by the Smart Bootstrap engine (Phase 5.1).
+/// Every record the engine seeds from an AI extraction gets exactly one row
+/// recording where it came from: the source document, the extracted value that
+/// seeded it, that value's extraction confidence, and the extraction provider
+/// (engine[:model]). Records created by hand have no provenance row.
+model CrmRecordProvenance {
+  id String @id @default(cuid())
+
+  /// CRM record kind, from ENTITY_TYPES: COMPANY | PROJECT | SITE | CONTRACT | PURCHASE | PRACTICE.
+  entityType String
+  /// Id of the created CRM record (not a FK — polymorphic across the CRM tables).
+  entityId   String
+
+  /// Document whose extraction produced the record.
+  sourceDocumentId String
+  sourceDocument   Document @relation(fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+
+  /// The DocumentField.key the value came from (e.g. "company", "project", "site").
+  matchedKey     String
+  /// The raw extracted value used to create the record.
+  extractedValue String
+  /// 0–1 extraction confidence of that value.
+  confidence Float
+  /// Extraction provider that produced the value: engine or "engine:model".
+  provider   String
+
+  createdAt DateTime @default(now())
+
+  @@unique([entityType, entityId])
+  @@index([sourceDocumentId])
+}
+

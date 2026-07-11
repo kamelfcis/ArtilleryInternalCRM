@@ -1,0 +1,47 @@
+﻿# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env
+.env.*
+!.env.example
+
+# prisma / database
+/prisma/*.db
+/prisma/*.db-journal
+/prisma/dev.db*
+
+# document storage (uploaded files live outside version control)
+/storage/**
+!/storage/.gitkeep
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# OCR (Tesseract trained-data cache — re-downloaded on demand)
+/.cache
+
+prisma/turso-schema.sql
+scripts/apply-turso-schema.mjs
