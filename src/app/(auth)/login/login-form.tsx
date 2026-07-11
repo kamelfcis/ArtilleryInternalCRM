@@ -33,7 +33,8 @@ export function LoginForm({ next }: { next: string }) {
           type="email"
           autoComplete="username"
           dir="ltr"
-          className="field-input text-left"
+          defaultValue="hossam@artillery.local"
+          className="field-input text-center"
           placeholder="name@artillery.local"
           aria-invalid={Boolean(state.fieldErrors?.email)}
         />
@@ -53,7 +54,9 @@ export function LoginForm({ next }: { next: string }) {
           name="password"
           type="password"
           autoComplete="current-password"
-          className="field-input"
+          dir="ltr"
+          defaultValue="Admin@12345"
+          className="field-input text-center"
           placeholder="••••••••"
           aria-invalid={Boolean(state.fieldErrors?.password)}
         />
