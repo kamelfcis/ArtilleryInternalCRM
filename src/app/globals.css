@@ -117,11 +117,15 @@
 
   /* CRM module card */
   .crm-module-card {
-    @apply group relative overflow-hidden rounded-card border border-line/60 bg-white/75 p-4 shadow-card backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-card-hover;
+    @apply relative overflow-hidden rounded-card border border-line/60 bg-white/75 p-4 shadow-card backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-card-hover;
   }
   .crm-module-card::before {
     content: "";
-    @apply absolute inset-x-0 top-0 h-0.5 opacity-60 transition-opacity duration-300 group-hover:opacity-100;
+    @apply absolute inset-x-0 top-0 h-0.5 opacity-60 transition-opacity duration-300;
+  
+  }
+  .crm-module-card:hover::before {
+    opacity: 1;
   }
 
   /* Activity timeline dot */
