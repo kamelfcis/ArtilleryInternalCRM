@@ -7,7 +7,6 @@ import {
   Camera,
   CheckCircle2,
   FileUp,
-  ScanLine,
   Trash2,
   UploadCloud,
 } from "lucide-react";
@@ -24,11 +23,10 @@ import {
 } from "@/app/(app)/folders/actions";
 import {
   assignFilesToInput,
+  imageFileToPdf,
   previewUrlForFile,
-  scanImageFileToPdf,
 } from "@/lib/document-scan";
-import { cn, formatFileSize } from "@/lib/utils";
-import { DocumentScannerPanel } from "./document-scanner-panel";
+import { cn, formatFileSize, getExtension } from "@/lib/utils";
 import { DocumentThumbnail } from "./document-thumbnail";
 
 type ServerAction = (
@@ -70,6 +68,22 @@ interface PendingFile {
   id: string;
   file: File;
   previewUrl: string;
+  displayName: string;
+}
+
+function stemFromFilename(filename: string): string {
+  const idx = filename.lastIndexOf(".");
+  return idx > 0 ? filename.slice(0, idx) : filename;
+}
+
+function fileWithDisplayName(file: File, displayName: string): File {
+  const ext = getExtension(file.name);
+  const base = displayName.trim().replace(/\.[^.]+$/, "") || stemFromFilename(file.name);
+  const finalName = ext ? `${base}.${ext}` : base;
+  return new File([file], finalName, {
+    type: file.type,
+    lastModified: file.lastModified,
+  });
 }
 
 // --- Upload documents ------------------------------------------------------
@@ -87,8 +101,7 @@ export function UploadDialog({
   const fileRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const [pending, setPending] = useState<PendingFile[]>([]);
-  const [showScanner, setShowScanner] = useState(false);
-  const [scanningImage, setScanningImage] = useState(false);
+  const [convertingImage, setConvertingImage] = useState(false);
   const cameraPickRef = useRef<HTMLInputElement>(null);
 
   useCloseOnSuccess(state.ok, onClose);
@@ -99,7 +112,6 @@ export function UploadDialog({
         for (const p of prev) URL.revokeObjectURL(p.previewUrl);
         return [];
       });
-      setShowScanner(false);
     }
   }, [open]);
 
@@ -110,6 +122,7 @@ export function UploadDialog({
         id: `${file.name}-${file.size}-${Date.now()}-${Math.random()}`,
         file,
         previewUrl: previewUrlForFile(file),
+        displayName: stemFromFilename(file.name),
       });
     }
     setPending((prev) => [...prev, ...next]);
@@ -123,6 +136,12 @@ export function UploadDialog({
     });
   }
 
+  function updateDisplayName(id: string, displayName: string) {
+    setPending((prev) =>
+      prev.map((p) => (p.id === id ? { ...p, displayName } : p)),
+    );
+  }
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     if (pending.length === 0) {
       e.preventDefault();
@@ -131,20 +150,20 @@ export function UploadDialog({
     if (fileRef.current) {
       assignFilesToInput(
         fileRef.current,
-        pending.map((p) => p.file),
+        pending.map((p) => fileWithDisplayName(p.file, p.displayName)),
       );
     }
   }
 
-  async function handleImageScan(file: File) {
-    setScanningImage(true);
+  async function handleQuickPhoto(file: File) {
+    setConvertingImage(true);
     try {
-      const pdf = await scanImageFileToPdf(file);
+      const pdf = await imageFileToPdf(file);
       addFiles([pdf]);
     } catch {
       addFiles([file]);
     } finally {
-      setScanningImage(false);
+      setConvertingImage(false);
     }
   }
 
@@ -154,7 +173,7 @@ export function UploadDialog({
       onClose={onClose}
       title="رفع وثائق"
       wide
-      description="اختر ملفات، أو امسح وثيقة بالكاميرا مع اكتشاف الحدود وتحويلها إلى PDF"
+      description="اختر ملفات من الجهاز أو التقط صورة سريعة وتحويلها إلى PDF"
     >
       <form
         ref={formRef}
@@ -164,8 +183,7 @@ export function UploadDialog({
       >
         <input type="hidden" name="folderId" value={folderId} />
 
-        {/* Upload modes */}
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <label
             htmlFor="upload-files"
             className={cn(
@@ -181,29 +199,13 @@ export function UploadDialog({
 
           <button
             type="button"
-            onClick={() => setShowScanner((v) => !v)}
-            className={cn(
-              "flex flex-col items-center justify-center gap-1.5 rounded-card border-2 border-dashed px-3 py-4 text-center transition-colors",
-              showScanner
-                ? "border-brand-400 bg-brand-50 ring-1 ring-brand-200"
-                : "border-line-strong bg-surface-muted hover:border-brand-300 hover:bg-brand-50/40",
-            )}
-          >
-            <ScanLine className="h-6 w-6 text-brand-500" aria-hidden />
-            <span className="text-xs font-medium text-brand-800">
-              مسح بالكاميرا
-            </span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => cameraPickRef.current?.click()}
-            disabled={scanningImage}
+            disabled={convertingImage}
             className="flex flex-col items-center justify-center gap-1.5 rounded-card border-2 border-dashed border-line-strong bg-surface-muted px-3 py-4 text-center transition-colors hover:border-brand-300 hover:bg-brand-50/40 disabled:opacity-60"
           >
             <Camera className="h-6 w-6 text-brand-500" aria-hidden />
             <span className="text-xs font-medium text-brand-800">
-              {scanningImage ? "جارٍ المعالجة…" : "صورة سريعة"}
+              {convertingImage ? "جارٍ التحويل…" : "صورة سريعة"}
             </span>
           </button>
         </div>
@@ -230,67 +232,81 @@ export function UploadDialog({
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file) void handleImageScan(file);
+            if (file) void handleQuickPhoto(file);
             e.target.value = "";
           }}
         />
 
-        {showScanner && (
-          <DocumentScannerPanel
-            onScanned={(file) => {
-              addFiles([file]);
-              setShowScanner(false);
-            }}
-            onClose={() => setShowScanner(false)}
-          />
-        )}
-
-        {/* Pending file previews */}
         {pending.length > 0 && (
           <div className="space-y-2">
             <p className="text-xs font-medium text-slate-500">
               الملفات الجاهزة للرفع ({pending.length})
             </p>
-            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {pending.map((item) => (
-                <li
-                  key={item.id}
-                  className="flex items-center gap-3 rounded-lg border border-line bg-white p-2 shadow-sm"
-                >
-                  <DocumentThumbnail
-                    file={item.file}
-                    name={item.file.name}
-                    size="sm"
-                    onClick={() => {
-                      window.open(item.previewUrl, "_blank", "noopener");
-                    }}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-brand-900">
-                      {item.file.name}
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      {formatFileSize(item.file.size)}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeFile(item.id)}
-                    className="btn-ghost shrink-0 p-1.5 text-slate-400 hover:text-red-600"
-                    aria-label={`إزالة ${item.file.name}`}
+            <ul className="grid grid-cols-1 gap-2">
+              {pending.map((item) => {
+                const ext = getExtension(item.file.name);
+                return (
+                  <li
+                    key={item.id}
+                    className="flex flex-col gap-2 rounded-lg border border-line bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:gap-3"
                   >
-                    <Trash2 className="h-4 w-4" aria-hidden />
-                  </button>
-                </li>
-              ))}
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <DocumentThumbnail
+                        file={item.file}
+                        name={item.file.name}
+                        size="sm"
+                        onClick={() => {
+                          window.open(item.previewUrl, "_blank", "noopener");
+                        }}
+                      />
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <label
+                          htmlFor={`pending-name-${item.id}`}
+                          className="text-xs font-medium text-slate-500"
+                        >
+                          اسم الوثيقة
+                        </label>
+                        <div className="flex items-center gap-1">
+                          <input
+                            id={`pending-name-${item.id}`}
+                            type="text"
+                            value={item.displayName}
+                            onChange={(e) =>
+                              updateDisplayName(item.id, e.target.value)
+                            }
+                            className="field-input min-w-0 flex-1 py-1.5 text-sm"
+                            dir="auto"
+                          />
+                          {ext && (
+                            <span className="shrink-0 text-xs text-slate-400">
+                              .{ext}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-400">
+                          {formatFileSize(item.file.size)}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(item.id)}
+                      className="btn-ghost shrink-0 self-end p-1.5 text-slate-400 hover:text-red-600 sm:self-center"
+                      aria-label={`إزالة ${item.displayName}`}
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}
 
-        {pending.length === 0 && !showScanner && (
+        {pending.length === 0 && (
           <div className="flex items-center gap-2 rounded-lg border border-line bg-surface-muted/50 px-3 py-2.5 text-xs text-slate-500">
             <FileUp className="h-4 w-4 shrink-0" aria-hidden />
-            لم تُضَف ملفات بعد. اختر ملفات أو امسح وثيقة بالكاميرا.
+            لم تُضَف ملفات بعد. اختر ملفات أو التقط صورة سريعة.
           </div>
         )}
 
