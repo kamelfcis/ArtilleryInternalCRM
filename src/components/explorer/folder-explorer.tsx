@@ -11,7 +11,6 @@ import {
   Trash2,
   Download,
   Eye,
-  FileText,
   Lock,
 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -80,7 +79,7 @@ export function FolderExplorer({
             <button
               type="button"
               onClick={() => setDialog({ type: "create" })}
-              className="btn-secondary"
+              className="btn-secondary min-h-11 px-4 sm:min-h-0"
             >
               <FolderPlus className="h-4 w-4" aria-hidden />
               مجلد جديد
@@ -90,7 +89,7 @@ export function FolderExplorer({
             <button
               type="button"
               onClick={() => setDialog({ type: "upload" })}
-              className="btn-primary"
+              className="btn-primary min-h-11 px-4 sm:min-h-0"
             >
               <UploadCloud className="h-4 w-4" aria-hidden />
               رفع وثائق
@@ -108,7 +107,7 @@ export function FolderExplorer({
                   returnToParent: true,
                 })
               }
-              className="btn-danger"
+              className="btn-danger min-h-11 px-4 sm:min-h-0"
             >
               <Trash2 className="h-4 w-4" aria-hidden />
               حذف المجلد
@@ -167,59 +166,100 @@ export function FolderExplorer({
           {documents.length > 0 && (
             <section>
               <SectionTitle label="الوثائق" count={documents.length} />
-              <div className="overflow-hidden rounded-card border border-line bg-white shadow-card">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-line text-right text-xs font-medium text-slate-500">
-                      <th className="px-4 py-3 font-medium">الاسم</th>
-                      <th className="hidden px-4 py-3 font-medium md:table-cell">
-                        الحجم
-                      </th>
-                      <th className="hidden px-4 py-3 font-medium lg:table-cell">
-                        آخر تحديث
-                      </th>
-                      <th className="hidden px-4 py-3 font-medium lg:table-cell">
-                        بواسطة
-                      </th>
-                      <th className="px-4 py-3" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line">
-                    {documents.map((doc) => (
-                      <DocumentRow
-                        key={doc.id}
-                        doc={doc}
-                        canEdit={canEdit}
-                        canManage={canManage}
-                        onPreview={() =>
-                          setDialog({
-                            type: "preview",
-                            id: doc.id,
-                            name: doc.name,
-                            mimeType: doc.mimeType,
-                            extension: doc.extension,
-                          })
-                        }
-                        onRename={() =>
-                          setDialog({
-                            type: "rename",
-                            kind: "document",
-                            id: doc.id,
-                            name: doc.name,
-                          })
-                        }
-                        onDelete={() =>
-                          setDialog({
-                            type: "delete",
-                            kind: "document",
-                            id: doc.id,
-                            name: doc.name,
-                          })
-                        }
-                      />
-                    ))}
-                  </tbody>
-                </table>
+
+              {/* Mobile: stacked cards */}
+              <div className="space-y-3 md:hidden">
+                {documents.map((doc) => (
+                  <DocumentCard
+                    key={doc.id}
+                    doc={doc}
+                    canEdit={canEdit}
+                    canManage={canManage}
+                    onPreview={() =>
+                      setDialog({
+                        type: "preview",
+                        id: doc.id,
+                        name: doc.name,
+                        mimeType: doc.mimeType,
+                        extension: doc.extension,
+                      })
+                    }
+                    onRename={() =>
+                      setDialog({
+                        type: "rename",
+                        kind: "document",
+                        id: doc.id,
+                        name: doc.name,
+                      })
+                    }
+                    onDelete={() =>
+                      setDialog({
+                        type: "delete",
+                        kind: "document",
+                        id: doc.id,
+                        name: doc.name,
+                      })
+                    }
+                  />
+                ))}
+              </div>
+
+              {/* Desktop: table */}
+              <div className="hidden overflow-hidden rounded-card border border-line bg-white shadow-card md:block">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-line text-right text-xs font-medium text-slate-500">
+                        <th className="px-4 py-3 font-medium">الاسم</th>
+                        <th className="hidden px-4 py-3 font-medium md:table-cell">
+                          الحجم
+                        </th>
+                        <th className="hidden px-4 py-3 font-medium lg:table-cell">
+                          آخر تحديث
+                        </th>
+                        <th className="hidden px-4 py-3 font-medium lg:table-cell">
+                          بواسطة
+                        </th>
+                        <th className="px-4 py-3" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-line">
+                      {documents.map((doc) => (
+                        <DocumentRow
+                          key={doc.id}
+                          doc={doc}
+                          canEdit={canEdit}
+                          canManage={canManage}
+                          onPreview={() =>
+                            setDialog({
+                              type: "preview",
+                              id: doc.id,
+                              name: doc.name,
+                              mimeType: doc.mimeType,
+                              extension: doc.extension,
+                            })
+                          }
+                          onRename={() =>
+                            setDialog({
+                              type: "rename",
+                              kind: "document",
+                              id: doc.id,
+                              name: doc.name,
+                            })
+                          }
+                          onDelete={() =>
+                            setDialog({
+                              type: "delete",
+                              kind: "document",
+                              id: doc.id,
+                              name: doc.name,
+                            })
+                          }
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </section>
           )}
@@ -333,6 +373,79 @@ function FolderCard({
   );
 }
 
+function DocumentCard({
+  doc,
+  canEdit,
+  canManage,
+  onPreview,
+  onRename,
+  onDelete,
+}: {
+  doc: DocumentView;
+  canEdit: boolean;
+  canManage: boolean;
+  onPreview: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+}) {
+  const previewUrl = `/api/documents/${doc.id}/content`;
+
+  return (
+    <article className="rounded-card border border-line bg-white p-4 shadow-card">
+      <div className="flex items-start gap-3">
+        <DocumentThumbnail
+          contentUrl={previewUrl}
+          mimeType={doc.mimeType}
+          extension={doc.extension}
+          name={doc.name}
+          size="sm"
+          onClick={onPreview}
+        />
+        <div className="min-w-0 flex-1">
+          <button
+            type="button"
+            onClick={onPreview}
+            className="block w-full truncate text-right font-medium text-brand-900 hover:text-brand-600 hover:underline"
+          >
+            {doc.name}
+          </button>
+          <p className="mt-0.5 text-xs text-slate-400">
+            {(doc.extension ?? "").toUpperCase()}
+            {doc.currentVersion > 1 &&
+              ` · الإصدار ${toArabicDigits(String(doc.currentVersion))}`}
+          </p>
+          <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+            <div>
+              <dt className="sr-only">الحجم</dt>
+              <dd>{formatFileSize(doc.size)}</dd>
+            </div>
+            <div>
+              <dt className="sr-only">آخر تحديث</dt>
+              <dd>{formatDate(doc.updatedAt)}</dd>
+            </div>
+            {doc.uploadedByName && (
+              <div>
+                <dt className="sr-only">بواسطة</dt>
+                <dd>{doc.uploadedByName}</dd>
+              </div>
+            )}
+          </dl>
+        </div>
+      </div>
+      <div className="mt-3 flex items-center justify-end border-t border-line pt-3">
+        <DocumentActions
+          previewUrl={previewUrl}
+          canEdit={canEdit}
+          canManage={canManage}
+          onPreview={onPreview}
+          onRename={onRename}
+          onDelete={onDelete}
+        />
+      </div>
+    </article>
+  );
+}
+
 function DocumentRow({
   doc,
   canEdit,
@@ -349,7 +462,6 @@ function DocumentRow({
   onDelete: () => void;
 }) {
   const previewUrl = `/api/documents/${doc.id}/content`;
-  const downloadUrl = `${previewUrl}?download=1`;
 
   return (
     <tr className="group hover:bg-surface-muted/60">
@@ -389,36 +501,82 @@ function DocumentRow({
         {doc.uploadedByName}
       </td>
       <td className="px-4 py-3">
-        <div className="flex items-center justify-end gap-1">
-          <a
-            href={downloadUrl}
-            className="btn-ghost p-2 text-slate-500 hover:text-brand-700"
-            title="تنزيل"
-          >
-            <Download className="h-4 w-4" aria-hidden />
-          </a>
-          <button
-            type="button"
-            onClick={onPreview}
-            className="btn-ghost p-2 text-slate-500 hover:text-brand-700"
-            title="معاينة"
-          >
-            <Eye className="h-4 w-4" aria-hidden />
-          </button>
-          {(canEdit || canManage) && (
-            <ItemMenu
-              onRename={canEdit ? onRename : undefined}
-              onDelete={canManage ? onDelete : undefined}
-              previewUrl={previewUrl}
-            />
-          )}
-        </div>
+        <DocumentActions
+          previewUrl={previewUrl}
+          canEdit={canEdit}
+          canManage={canManage}
+          onPreview={onPreview}
+          onRename={onRename}
+          onDelete={onDelete}
+        />
       </td>
     </tr>
   );
 }
 
-/** Small kebab dropdown menu shared by folder cards and document rows. */
+function DocumentActions({
+  previewUrl,
+  canEdit,
+  canManage,
+  onPreview,
+  onRename,
+  onDelete,
+}: {
+  previewUrl: string;
+  canEdit: boolean;
+  canManage: boolean;
+  onPreview: () => void;
+  onRename: () => void;
+  onDelete: () => void;
+}) {
+  const downloadUrl = `${previewUrl}?download=1`;
+
+  return (
+    <div className="flex items-center justify-end gap-1">
+      <a
+        href={downloadUrl}
+        className="btn-ghost min-h-11 min-w-11 p-2.5 text-slate-500 hover:text-brand-700 sm:min-h-0 sm:min-w-0 sm:p-2"
+        title="تنزيل"
+        aria-label="تنزيل الوثيقة"
+      >
+        <Download className="h-4 w-4" aria-hidden />
+      </a>
+      <button
+        type="button"
+        onClick={onPreview}
+        className="btn-ghost min-h-11 min-w-11 p-2.5 text-slate-500 hover:text-brand-700 sm:min-h-0 sm:min-w-0 sm:p-2"
+        title="معاينة"
+        aria-label="معاينة الوثيقة"
+      >
+        <Eye className="h-4 w-4" aria-hidden />
+      </button>
+      {canEdit && (
+        <button
+          type="button"
+          onClick={onRename}
+          className="btn-ghost min-h-11 min-w-11 p-2.5 text-slate-500 hover:text-brand-700 sm:min-h-0 sm:min-w-0 sm:p-2"
+          title="إعادة تسمية"
+          aria-label="إعادة تسمية الوثيقة"
+        >
+          <Pencil className="h-4 w-4" aria-hidden />
+        </button>
+      )}
+      {canManage && (
+        <button
+          type="button"
+          onClick={onDelete}
+          className="btn-ghost min-h-11 min-w-11 p-2.5 text-red-500 hover:bg-red-50 sm:min-h-0 sm:min-w-0 sm:p-2"
+          title="حذف"
+          aria-label="حذف الوثيقة"
+        >
+          <Trash2 className="h-4 w-4" aria-hidden />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Small kebab dropdown menu for folder cards. */
 function ItemMenu({
   onRename,
   onDelete,
@@ -456,7 +614,7 @@ function ItemMenu({
         aria-label="خيارات"
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-white/90 text-slate-500 opacity-0 shadow-sm transition-opacity hover:text-brand-700 focus-visible:opacity-100 group-hover:opacity-100 aria-expanded:opacity-100"
+        className="flex h-11 w-11 items-center justify-center rounded-lg border border-line bg-white/90 text-slate-500 opacity-100 shadow-sm transition-opacity hover:text-brand-700 focus-visible:opacity-100 aria-expanded:opacity-100 sm:h-8 sm:w-8 sm:opacity-0 sm:group-hover:opacity-100"
       >
         <MoreVertical className="h-4 w-4" aria-hidden />
       </button>
